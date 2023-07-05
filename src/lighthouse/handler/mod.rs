@@ -1,6 +1,6 @@
+mod helpers;
 mod metrics;
 mod pull;
-mod helpers;
 
+pub use metrics::{get_metrics_handler, post_metrics_handler};
 pub use pull::post_pull_handler;
-pub use metrics::{post_metrics_handler, get_metrics_handler};

@@ -49,7 +49,7 @@ pub struct LighthouseNodeLease {
     pub route_allowed_ips: bool,
 }
 
-impl LighthouseNodeLease  {
+impl LighthouseNodeLease {
     /// Compares node leases, excluding timestamps.
     pub fn compare_to(&self, other: &LighthouseNodeLease) -> bool {
         self.public_key == other.public_key

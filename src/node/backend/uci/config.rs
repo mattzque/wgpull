@@ -1,6 +1,5 @@
 use serde::Deserialize;
 
-
 /// UciConfig backend configuration of a node.
 #[derive(Debug, Clone, Deserialize)]
 pub struct UciConfig {

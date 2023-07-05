@@ -12,7 +12,7 @@ use log::info;
 use shared_lib::time::CurrentSystemTime;
 
 use crate::lighthouse::config::LighthouseConfigFile;
-use shared_lib::{logger, config};
+use shared_lib::{config, logger};
 
 fn router(config: LighthouseConfig) -> anyhow::Result<Router> {
     // system time provider, uses SystemTime
@@ -33,7 +33,9 @@ fn router(config: LighthouseConfig) -> anyhow::Result<Router> {
     // build a router with the chain & pipeline
     Ok(build_router(chain, pipelines, |route| {
         route.post("/api/v1/pull").to(handler::post_pull_handler);
-        route.post("/api/v1/metrics").to(handler::post_metrics_handler);
+        route
+            .post("/api/v1/metrics")
+            .to(handler::post_metrics_handler);
         route.get("/metrics").to(handler::get_metrics_handler);
     }))
 }

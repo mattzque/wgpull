@@ -14,18 +14,29 @@ pub enum ValidationError {
 
 pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), ValidationError> {
     if hostname.len() > 253 {
-        return Err(ValidationError::InvalidFormat(name, "Hostname is longer than 253 characters"));
+        return Err(ValidationError::InvalidFormat(
+            name,
+            "Hostname is longer than 253 characters",
+        ));
     }
 
     for label in hostname.split('.') {
         let len = label.len();
         if len == 0 || len > 63 {
-            return Err(ValidationError::InvalidFormat(name, "A label is empty or longer than 63 characters"));
+            return Err(ValidationError::InvalidFormat(
+                name,
+                "A label is empty or longer than 63 characters",
+            ));
         }
 
-        if !label.chars().all(|c| c.is_alphanumeric() || c == '-') || 
-           label.starts_with('-') || label.ends_with('-') {
-            return Err(ValidationError::InvalidFormat(name, "Invalid character in label or label starts/ends with a hyphen"));
+        if !label.chars().all(|c| c.is_alphanumeric() || c == '-')
+            || label.starts_with('-')
+            || label.ends_with('-')
+        {
+            return Err(ValidationError::InvalidFormat(
+                name,
+                "Invalid character in label or label starts/ends with a hyphen",
+            ));
         }
     }
 
@@ -40,7 +51,10 @@ pub fn validate_ip(name: &'static str, ip: &str) -> Result<(), ValidationError> 
     Ok(())
 }
 
-pub fn validate_hostname_or_ip(name: &'static str, hostname_or_ip: &str) -> Result<(), ValidationError> {
+pub fn validate_hostname_or_ip(
+    name: &'static str,
+    hostname_or_ip: &str,
+) -> Result<(), ValidationError> {
     if hostname_or_ip.is_empty() {
         return Err(ValidationError::EmptyValue(name));
     }
@@ -61,7 +75,10 @@ pub fn validate_cidr(name: &'static str, address: &str) -> Result<(), Validation
     }
 
     if IpNet::from_str(address).is_err() {
-        return Err(ValidationError::InvalidFormat(name, "Invalid IP network CIDR"));
+        return Err(ValidationError::InvalidFormat(
+            name,
+            "Invalid IP network CIDR",
+        ));
     }
 
     Ok(())
@@ -77,10 +94,13 @@ pub fn validate_wg_key(name: &'static str, key: &str) -> Result<(), ValidationEr
             if decoded.len() == 32 {
                 Ok(())
             } else {
-                Err(ValidationError::InvalidFormat(name, "Invalid key length (32)"))
+                Err(ValidationError::InvalidFormat(
+                    name,
+                    "Invalid key length (32)",
+                ))
             }
-        },
-        Err(_) => Err(ValidationError::InvalidFormat(name, "Invalid base64"))
+        }
+        Err(_) => Err(ValidationError::InvalidFormat(name, "Invalid base64")),
     }
 }
 
@@ -90,12 +110,18 @@ pub fn validate_interface_name(name: &'static str, interface: &str) -> Result<()
     }
 
     if interface.len() > 15 {
-        return Err(ValidationError::InvalidFormat(name, "Invalid interface length (16 max)"))
+        return Err(ValidationError::InvalidFormat(
+            name,
+            "Invalid interface length (16 max)",
+        ));
     }
 
     if !interface.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return Err(ValidationError::InvalidFormat(name, "Interface name contains invalid characters"))
-    } 
+        return Err(ValidationError::InvalidFormat(
+            name,
+            "Interface name contains invalid characters",
+        ));
+    }
 
     Ok(())
 }

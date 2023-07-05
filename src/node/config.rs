@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use super::backend::{BackendType, SystemdConfig, UciConfig};
+use serde::Deserialize;
 
 /// Node configuration.
 #[derive(Debug, Clone, Deserialize)]
@@ -60,7 +60,6 @@ pub struct WireguardConfig {
     /// Whether or not the allowed ips should route through the wireguard interface.
     pub route_allowed_ips: bool,
 }
-
 
 /// Configuration for a node.
 #[derive(Clone, Debug, Deserialize)]

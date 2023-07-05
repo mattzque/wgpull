@@ -1,6 +1,6 @@
-mod command;
 mod backend;
+mod command;
 mod config;
 pub use backend::SystemdBackend;
-pub use config::SystemdConfig;
 pub use command::SystemdCommand;
+pub use config::SystemdConfig;

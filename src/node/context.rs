@@ -1,13 +1,14 @@
+use super::{agent::NodeAgent, config::NodeConfigFile, state::NodeState};
+use crate::node::{backend::get_backend_impl, state::NodeError};
 use anyhow::Result;
 use gotham::state::StateData;
 use log::info;
-use shared_lib::{wg::{WireguardCommand, WireguardInfo}, command::SystemCommandExecutor, request::{NodePullRequest, NodeMetricsPushRequest, NodeMetricsPushRequestPeer}};
-use std::{
-    sync::{Arc, Mutex},
+use shared_lib::{
+    command::SystemCommandExecutor,
+    request::{NodeMetricsPushRequest, NodeMetricsPushRequestPeer, NodePullRequest},
+    wg::{WireguardCommand, WireguardInfo},
 };
-use super::{agent::NodeAgent, config::{NodeConfigFile}, state::NodeState};
-use crate::{node::{state::NodeError, backend::get_backend_impl}};
-
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, StateData)]
 pub struct NodeContext {
@@ -55,7 +56,10 @@ impl NodeContext {
         let request: NodePullRequest = state.clone().into();
         let response = agent.pull_wireguard(request)?;
 
-        info!("Received configuration of {} peers from lighthouse.", response.peers.len());
+        info!(
+            "Received configuration of {} peers from lighthouse.",
+            response.peers.len()
+        );
 
         // update state from response, replacing all peers and regenerate keys if requested
         state.update_from_pull_response(&response)?;
@@ -75,7 +79,10 @@ impl NodeContext {
         Ok(())
     }
 
-    fn metrics_push_request_from_info(&self, info: WireguardInfo) -> Result<NodeMetricsPushRequest> {
+    fn metrics_push_request_from_info(
+        &self,
+        info: WireguardInfo,
+    ) -> Result<NodeMetricsPushRequest> {
         let state = self
             .state
             .lock()
@@ -104,9 +111,7 @@ impl NodeContext {
     }
 
     pub fn push_metrics(&self) -> Result<()> {
-        let wireguard_command = WireguardCommand::new(
-            SystemCommandExecutor::default()
-        );
+        let wireguard_command = WireguardCommand::new(SystemCommandExecutor::default());
         // get agent
         let agent = self
             .agent

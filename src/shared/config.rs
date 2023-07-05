@@ -1,7 +1,7 @@
+use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io::Read;
 use thiserror::Error;
-use serde::de::DeserializeOwned;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {

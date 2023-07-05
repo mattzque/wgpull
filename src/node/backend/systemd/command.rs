@@ -2,7 +2,7 @@ use anyhow::Result;
 use shared_lib::command::CommandExecutor;
 
 pub struct SystemdCommand<T: CommandExecutor> {
-    executor: T
+    executor: T,
 }
 
 impl<T: CommandExecutor> SystemdCommand<T> {
@@ -11,11 +11,15 @@ impl<T: CommandExecutor> SystemdCommand<T> {
     }
 
     pub fn service_is_running(&self, service: &str) -> bool {
-        self.executor.execute_with_args("systemctl", &["is-active", service]).is_ok()
+        self.executor
+            .execute_with_args("systemctl", &["is-active", service])
+            .is_ok()
     }
 
     pub fn service_is_enabled(&self, service: &str) -> bool {
-        self.executor.execute_with_args("systemctl", &["is-enabled", service]).is_ok()
+        self.executor
+            .execute_with_args("systemctl", &["is-enabled", service])
+            .is_ok()
     }
 
     pub fn service_is_running_and_enabled(&self, service: &str) -> bool {
@@ -23,7 +27,8 @@ impl<T: CommandExecutor> SystemdCommand<T> {
     }
 
     pub fn delete_wireguard_interface(&self, interface: &str) -> Result<()> {
-        self.executor.execute_with_args("networkctl", &["delete", interface])?;
+        self.executor
+            .execute_with_args("networkctl", &["delete", interface])?;
         Ok(())
     }
 

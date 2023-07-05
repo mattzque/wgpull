@@ -29,7 +29,7 @@ pub struct KeyPair {
 }
 
 pub struct WireguardCommand<T: CommandExecutor> {
-    executor: T
+    executor: T,
 }
 
 impl<T: CommandExecutor> WireguardCommand<T> {
@@ -38,7 +38,9 @@ impl<T: CommandExecutor> WireguardCommand<T> {
     }
 
     pub fn collect(&self) -> Result<Option<WireguardInfo>> {
-        let (stdout, _) = self.executor.execute_with_args("wg", &["show", "all", "dump"])?;
+        let (stdout, _) = self
+            .executor
+            .execute_with_args("wg", &["show", "all", "dump"])?;
 
         if stdout.lines().count() == 0 {
             return Ok(None);
@@ -84,7 +86,9 @@ impl<T: CommandExecutor> WireguardCommand<T> {
     }
 
     pub fn generate_pubkey(&self, private_key: String) -> Result<String> {
-        let (stdout, _) = self.executor.execute_with_args_and_io("wg", &["pubkey"], &private_key)?;
+        let (stdout, _) =
+            self.executor
+                .execute_with_args_and_io("wg", &["pubkey"], &private_key)?;
         Ok(stdout.trim().to_string())
     }
 

@@ -2,8 +2,6 @@ use std::collections::HashMap;
 
 use shared_lib::request::NodeMetricsPushRequest;
 
-
-
 /// A collected peer metrics of a node.
 pub struct LighthouseMetricsPeer {
     /// Hostname of the peer.
@@ -37,17 +35,21 @@ pub struct LighthouseCollectedMetric {
 /// The collected metrics of all nodes.
 #[derive(Default)]
 pub struct LighthouseMetrics {
-    metrics: HashMap<String, LighthouseCollectedMetric>
+    metrics: HashMap<String, LighthouseCollectedMetric>,
 }
 
 impl LighthouseMetrics {
     pub fn upsert_metrics(&mut self, request: &NodeMetricsPushRequest) {
-        let peers = request.peers.iter().map(|peer| LighthouseMetricsPeer {
-            hostname: peer.hostname.clone(),
-            latest_handshake: peer.latest_handshake,
-            transfer_rx: peer.transfer_rx,
-            transfer_tx: peer.transfer_tx,
-        }).collect();
+        let peers = request
+            .peers
+            .iter()
+            .map(|peer| LighthouseMetricsPeer {
+                hostname: peer.hostname.clone(),
+                latest_handshake: peer.latest_handshake,
+                transfer_rx: peer.transfer_rx,
+                transfer_tx: peer.transfer_tx,
+            })
+            .collect();
 
         let metric = LighthouseCollectedMetric {
             hostname: request.hostname.clone(),
@@ -64,11 +66,23 @@ impl LighthouseMetrics {
         let mut export = String::new();
 
         for (hostname, metric) in &self.metrics {
-            export.push_str(&format!("lighthouse_node_up{{hostname=\"{}\"}} 1\n", hostname));
+            export.push_str(&format!(
+                "lighthouse_node_up{{hostname=\"{}\"}} 1\n",
+                hostname
+            ));
             for peer in &metric.peers {
-                export.push_str(&format!("lighthouse_peer_latest_handshake{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n", hostname, peer.hostname, peer.latest_handshake));
-                export.push_str(&format!("lighthouse_peer_transfer_rx{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n", hostname, peer.hostname, peer.transfer_rx));
-                export.push_str(&format!("lighthouse_peer_transfer_tx{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n", hostname, peer.hostname, peer.transfer_tx));
+                export.push_str(&format!(
+                    "lighthouse_peer_latest_handshake{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n",
+                    hostname, peer.hostname, peer.latest_handshake
+                ));
+                export.push_str(&format!(
+                    "lighthouse_peer_transfer_rx{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n",
+                    hostname, peer.hostname, peer.transfer_rx
+                ));
+                export.push_str(&format!(
+                    "lighthouse_peer_transfer_tx{{hostname=\"{}\",peer_hostname=\"{}\"}} {}\n",
+                    hostname, peer.hostname, peer.transfer_tx
+                ));
             }
         }
 

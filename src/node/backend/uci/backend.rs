@@ -49,7 +49,9 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
             peers: uci_peers,
         };
 
-        let changed = if let Ok(current_uci_config) = self.command.get_wireguard_config(&self.config.interface) {
+        let changed = if let Ok(current_uci_config) =
+            self.command.get_wireguard_config(&self.config.interface)
+        {
             info!(
                 "current_uci_config.peers: {}",
                 current_uci_config.peers.len()
@@ -65,7 +67,8 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
                 "[uci] update local wireguard configuration, using {} peers",
                 uci_config.peers.len()
             );
-            self.command.update_wireguard_config(&self.config.interface, &uci_config)?;
+            self.command
+                .update_wireguard_config(&self.config.interface, &uci_config)?;
             self.command.commit(&self.config.interface)?;
             Ok(true)
         } else {

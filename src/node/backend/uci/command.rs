@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::{error, debug};
+use log::{debug, error};
 use shared_lib::command::CommandExecutor;
 use thiserror::Error;
 
@@ -8,7 +8,7 @@ pub enum UciError {
     #[error("Error running UCI command: {0}")]
     UciCommandFailed(String),
     #[error("Some UCI value could not be parsed!")]
-    ParseError
+    ParseError,
 }
 
 impl From<std::io::Error> for UciError {
@@ -16,7 +16,6 @@ impl From<std::io::Error> for UciError {
         Self::UciCommandFailed(err.to_string())
     }
 }
-
 
 #[derive(Debug, PartialEq)]
 pub struct UciWireguardPeer {
@@ -38,7 +37,7 @@ pub struct UciWireguardConfig {
 }
 
 pub struct UciCommand<T: CommandExecutor> {
-    executor: T 
+    executor: T,
 }
 
 impl<T: CommandExecutor> UciCommand<T> {
@@ -47,7 +46,8 @@ impl<T: CommandExecutor> UciCommand<T> {
     }
 
     pub fn test_uci(&self) -> bool {
-        self.executor.execute("uci")
+        self.executor
+            .execute("uci")
             .map(|(_, _)| true)
             .unwrap_or_else(|err| {
                 error!("uci command failed: {}", err.to_string());
@@ -61,7 +61,9 @@ impl<T: CommandExecutor> UciCommand<T> {
     /// returns lists of keys like cfg1096fc, ...
     ///
     fn list_peer_sections(&self, interface: &str) -> Result<Vec<String>, UciError> {
-        let (stdout, _) = self.executor.execute_with_args("uci", &["-X", "show"])
+        let (stdout, _) = self
+            .executor
+            .execute_with_args("uci", &["-X", "show"])
             .map_err(|e| UciError::UciCommandFailed(e.to_string()))?;
 
         // find all network sections with wireguard_ prefix
@@ -100,15 +102,21 @@ impl<T: CommandExecutor> UciCommand<T> {
     }
 
     fn new_network_section(&self, key: &str) -> Result<String, UciError> {
-        let (value, _) = self.executor.execute_with_args("uci", &["add", "network", key])?;
+        let (value, _) = self
+            .executor
+            .execute_with_args("uci", &["add", "network", key])?;
         let value = value.trim();
-        debug!("uci new network section for key ({}) returned {}", key, value);
+        debug!(
+            "uci new network section for key ({}) returned {}",
+            key, value
+        );
         Ok(value.to_string())
     }
 
     fn add_list_value(&self, key: &str, value: &str) -> Result<(), UciError> {
         let setter = format!("{}={}", key, value);
-        self.executor.execute_with_args("uci", &["add_list", &setter])?;
+        self.executor
+            .execute_with_args("uci", &["add_list", &setter])?;
         debug!("uci add list, for key ({}) add value {}", key, value);
         Ok(())
     }
@@ -126,10 +134,12 @@ impl<T: CommandExecutor> UciCommand<T> {
             endpoint_host: self.get_value(&format!("network.{}.endpoint_host", key))?,
             endpoint_port: self
                 .get_value(&format!("network.{}.endpoint_port", key))?
-                .parse::<u32>().map_err(|_| UciError::ParseError)?,
+                .parse::<u32>()
+                .map_err(|_| UciError::ParseError)?,
             persistent_keepalive: self
                 .get_value(&format!("network.{}.persistent_keepalive", key))?
-                .parse::<u32>().map_err(|_| UciError::ParseError)?,
+                .parse::<u32>()
+                .map_err(|_| UciError::ParseError)?,
             route_allowed_ips: self.get_value(&format!("network.{}.route_allowed_ips", key))?
                 == "1",
             allowed_ips: self
@@ -149,25 +159,23 @@ impl<T: CommandExecutor> UciCommand<T> {
         let mut peers = peers?;
         peers.sort_by(|a, b| a.description.cmp(&b.description));
         Ok(UciWireguardConfig {
-            private_key: self
-                .get_value(&format!("network.{}.private_key", interface))?,
+            private_key: self.get_value(&format!("network.{}.private_key", interface))?,
             listen_port: self
                 .get_value(&format!("network.{}.listen_port", interface))?
-                .parse::<u32>().map_err(|_| UciError::ParseError)?,
+                .parse::<u32>()
+                .map_err(|_| UciError::ParseError)?,
             addresses: self.get_value(&format!("network.{}.addresses", interface))?,
             peers,
         })
     }
 
-    pub fn update_wireguard_config(&self, interface: &str, config: &UciWireguardConfig) -> Result<(), UciError> {
-        self.set_value(
-            format!("network.{}", interface).as_str(),
-            "interface",
-        )?;
-        self.set_value(
-            format!("network.{}.proto", interface).as_str(),
-            "wireguard",
-        )?;
+    pub fn update_wireguard_config(
+        &self,
+        interface: &str,
+        config: &UciWireguardConfig,
+    ) -> Result<(), UciError> {
+        self.set_value(format!("network.{}", interface).as_str(), "interface")?;
+        self.set_value(format!("network.{}.proto", interface).as_str(), "wireguard")?;
         self.set_value(
             format!("network.{}.private_key", interface).as_str(),
             &config.private_key,
@@ -235,7 +243,9 @@ impl<T: CommandExecutor> UciCommand<T> {
     }
 
     pub fn get_hostname(&self) -> Result<String, UciError> {
-        let (value, _) = self.executor.execute_with_args("uci", &["get", "system.@system[0].hostname"])?;
+        let (value, _) = self
+            .executor
+            .execute_with_args("uci", &["get", "system.@system[0].hostname"])?;
         Ok(value.trim().to_string())
     }
 }

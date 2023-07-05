@@ -1,13 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::net::Ipv4Addr;
-
 
 const DISCOVER_SERVICES: [&str; 3] = [
     "https://api.ipify.org",
     "https://api4.my-ip.io/ip.txt",
-    "https://checkip.amazonaws.com"
+    "https://checkip.amazonaws.com",
 ];
-
 
 /// Discovers the public ip of the node using public services on the internet.
 /// This is used if the endpoint is set to "discover".

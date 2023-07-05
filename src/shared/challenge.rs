@@ -1,22 +1,20 @@
-use sha2::{Sha256, Digest};
-use rand::{thread_rng, Rng};
 use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
+use sha2::{Digest, Sha256};
 
 pub struct ChallengeResponse {
     secret: String,
-    challenge: String
+    challenge: String,
 }
 
 impl ChallengeResponse {
     pub fn new(secret: String) -> Self {
-        let challenge = thread_rng().sample_iter(&Alphanumeric)
-                    .take(64)
-                    .map(char::from)
-                    .collect();
-        Self {
-            secret,
-            challenge,
-        }
+        let challenge = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(64)
+            .map(char::from)
+            .collect();
+        Self { secret, challenge }
     }
 
     pub fn with_challenge(secret: String, challenge: &str) -> Self {

@@ -1,6 +1,5 @@
-use std::time::SystemTime;
 use chrono::{DateTime, Local};
-
+use std::time::SystemTime;
 
 /// Trait for getting the current time.
 /// This is used to allow mocking the time in tests.

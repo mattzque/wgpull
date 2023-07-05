@@ -1,5 +1,8 @@
-use std::{io::{Error, ErrorKind, Result}, process::Stdio};
 use std::io::Write;
+use std::{
+    io::{Error, ErrorKind, Result},
+    process::Stdio,
+};
 
 /// CommandExecutor Return type: (stdout, stderr)
 type Output = (String, String);
@@ -14,7 +17,8 @@ pub trait CommandExecutor {
     fn execute_with_args(&self, command: &str, args: &[&str]) -> Result<Output>;
 
     /// Runs a single executable with arguments, passing the provided stdin.
-    fn execute_with_args_and_io(&self, command: &str, args: &[&str], stdin: &str) -> Result<Output>;
+    fn execute_with_args_and_io(&self, command: &str, args: &[&str], stdin: &str)
+        -> Result<Output>;
 }
 
 #[derive(Default)]
@@ -27,9 +31,11 @@ fn decode_output(output: std::process::Output) -> Result<Output> {
         let stderr = String::from_utf8(output.stderr)
             .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
         Ok((stdout, stderr))
-    }
-    else {
-        Err(Error::new(ErrorKind::Other, "Command returned non-zero exit code."))
+    } else {
+        Err(Error::new(
+            ErrorKind::Other,
+            "Command returned non-zero exit code.",
+        ))
     }
 }
 
@@ -42,18 +48,19 @@ impl CommandExecutor for SystemCommandExecutor {
         decode_output(std::process::Command::new(command).args(args).output()?)
     }
 
-    fn execute_with_args_and_io(&self, command: &str, args: &[&str], stdin: &str) -> Result<Output> {
+    fn execute_with_args_and_io(
+        &self,
+        command: &str,
+        args: &[&str],
+        stdin: &str,
+    ) -> Result<Output> {
         let mut child = std::process::Command::new(command)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
 
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(stdin.as_bytes())?;
+        child.stdin.as_mut().unwrap().write_all(stdin.as_bytes())?;
 
         let output = child.wait_with_output()?;
 

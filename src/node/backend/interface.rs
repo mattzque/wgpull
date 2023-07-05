@@ -1,9 +1,13 @@
+use crate::node::config::NodeConfigFile;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use shared_lib::command::SystemCommandExecutor;
-use crate::node::config::NodeConfigFile;
 
-use super::{super::state::NodeState, uci::{UciBackend, UciCommand}, systemd::{SystemdBackend, SystemdCommand}};
+use super::{
+    super::state::NodeState,
+    systemd::{SystemdBackend, SystemdCommand},
+    uci::{UciBackend, UciCommand},
+};
 
 #[derive(Clone, Eq, PartialEq, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -27,7 +31,10 @@ pub trait Backend {
 pub fn get_backend_impl(backend: BackendType, config: &NodeConfigFile) -> Box<dyn Backend> {
     let executor = SystemCommandExecutor::default();
     match backend {
-        BackendType::Systemd => Box::new(SystemdBackend::new(&config.systemd, SystemdCommand::new(executor))),
+        BackendType::Systemd => Box::new(SystemdBackend::new(
+            &config.systemd,
+            SystemdCommand::new(executor),
+        )),
         BackendType::Uci => Box::new(UciBackend::new(&config.uci, UciCommand::new(executor))),
     }
 }

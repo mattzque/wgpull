@@ -1,10 +1,10 @@
 pub mod challenge;
+pub mod command;
 pub mod config;
+pub mod headers;
 pub mod logger;
 pub mod request;
 pub mod response;
-pub mod wg;
-pub mod headers;
-pub mod command;
 pub mod time;
 pub mod validation;
+pub mod wg;

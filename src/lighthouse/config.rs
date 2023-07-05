@@ -27,7 +27,6 @@ impl LighthouseConfig {
     }
 }
 
-
 /// Configuration for a lighthouse.
 #[derive(Debug, Deserialize)]
 pub struct LighthouseConfigFile {

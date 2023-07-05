@@ -2,15 +2,15 @@ use futures_util::future::{self, FutureExt};
 use gotham::handler::HandlerFuture;
 use gotham::helpers::http::response::{create_empty_response, create_response};
 use gotham::hyper::{body, Body, HeaderMap, StatusCode};
-use gotham::prelude::*;
 use gotham::mime;
+use gotham::prelude::*;
 use gotham::state::State;
-use log::{info, error};
+use log::{error, info};
 use shared_lib::time::CurrentSystemTime;
 use std::pin::Pin;
 
 use crate::lighthouse::context::LighthouseContext;
-use crate::lighthouse::handler::helpers::{verify_lighthouse_key, get_challenge_response};
+use crate::lighthouse::handler::helpers::{get_challenge_response, verify_lighthouse_key};
 use shared_lib::headers::HEADER_NODE_RESPONSE;
 use shared_lib::request::NodePullRequest;
 

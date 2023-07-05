@@ -1,8 +1,6 @@
 use env_logger::Builder;
 use log::LevelFilter;
 
-
-
 pub fn setup_logger() {
     let mut builder = Builder::new();
 

@@ -66,7 +66,7 @@ impl LighthouseContext {
     pub fn node_pull<T>(&self, request: &NodePullRequest, time: &T) -> Result<NodePullResponse>
     where
         T: CurrentTime,
-     {
+    {
         let mut state = self
             .state
             .lock()
@@ -106,7 +106,7 @@ impl LighthouseContext {
 
         Ok(())
     }
-    
+
     pub fn get_metrics_prometheus_export(&self) -> Result<String> {
         let metrics = self
             .metrics

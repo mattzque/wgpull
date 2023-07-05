@@ -3,15 +3,15 @@ use futures_util::future::{self, FutureExt};
 use gotham::handler::HandlerFuture;
 use gotham::helpers::http::response::{create_empty_response, create_response};
 use gotham::hyper::{body, Body, HeaderMap, Response, StatusCode};
+use gotham::mime;
 use gotham::prelude::*;
 use gotham::state::State;
-use gotham::mime;
 use log::error;
 use shared_lib::headers::HEADER_NODE_RESPONSE;
 use shared_lib::request::NodeMetricsPushRequest;
 use std::pin::Pin;
 
-use super::helpers::{verify_lighthouse_key, get_challenge_response};
+use super::helpers::{get_challenge_response, verify_lighthouse_key};
 
 pub fn post_metrics_handler(mut state: State) -> Pin<Box<HandlerFuture>> {
     let f = body::to_bytes(Body::take_from(&mut state)).then(|full_body| match full_body {
@@ -67,16 +67,10 @@ pub fn get_metrics_handler(state: State) -> (State, Response<Body>) {
     let context = LighthouseContext::borrow_from(&state);
     if let Ok(prometheus_metrics) = context.get_metrics_prometheus_export() {
         // create response with challenge response header:
-        let res = create_response(
-            &state,
-            StatusCode::OK,
-            mime::TEXT_PLAIN,
-            prometheus_metrics,
-        );
+        let res = create_response(&state, StatusCode::OK, mime::TEXT_PLAIN, prometheus_metrics);
 
         (state, res)
-    }
-    else {
+    } else {
         let res = create_empty_response(&state, StatusCode::INTERNAL_SERVER_ERROR);
         (state, res)
     }

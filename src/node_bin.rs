@@ -1,9 +1,9 @@
 mod node;
-use log::{info, error};
+use log::{error, info};
 use std::time::{Duration, Instant};
 
-use crate::{node::{config::NodeConfigFile, context::NodeContext}};
-use shared_lib::{logger, config}; 
+use crate::node::{config::NodeConfigFile, context::NodeContext};
+use shared_lib::{config, logger};
 
 pub fn main() -> anyhow::Result<()> {
     logger::setup_logger();

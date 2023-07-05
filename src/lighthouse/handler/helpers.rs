@@ -1,5 +1,5 @@
-use gotham::hyper::HeaderMap;
 use crate::lighthouse::context::LighthouseContext;
+use gotham::hyper::HeaderMap;
 use shared_lib::headers::{HEADER_LIGHTHOUSE_KEY, HEADER_NODE_CHALLENGE};
 
 pub fn verify_lighthouse_key(context: &LighthouseContext, headers: &HeaderMap) -> bool {

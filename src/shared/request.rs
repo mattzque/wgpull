@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::validation::{ValidationError, validate_hostname, validate_wg_key, validate_hostname_or_ip, validate_cidr, validate_interface_name};
-
+use crate::validation::{
+    validate_cidr, validate_hostname, validate_hostname_or_ip, validate_interface_name,
+    validate_wg_key, ValidationError,
+};
 
 /// The request sent by a node to the lighthouse.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
-mod config;
-mod command;
 mod backend;
+mod command;
+mod config;
 
 pub use backend::UciBackend;
-pub use config::UciConfig;
 pub use command::UciCommand;
+pub use config::UciConfig;
