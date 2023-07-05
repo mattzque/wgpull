@@ -1,0 +1,71 @@
+[package]
+name = "wgpull"
+version = "0.1.0"
+edition = "2021"
+description = "A Wireguard configuration management system"
+authors = ["Matthias Hecker"]
+keywords = ["wireguard", "linux", "openwrt"]
+repository = "https://github.com/mattzque/wgpull"
+license = "MIT"
+
+[lib]
+name = "shared_lib"
+path = "./src/shared_lib.rs"
+
+[[bin]]
+name = "wgpull-lighthouse"
+path = "./src/lighthouse_bin.rs"
+
+[[bin]]
+name = "wgpull-node"
+path = "./src/node_bin.rs"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+gotham = { version = "0.7" }
+toml = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.0"
+futures-util = "0.3"
+log = "0.4"
+env_logger = "0.10"
+ureq = { version = "2.7", features = [ "charset", "gzip", "brotli" ], default-features = false }
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+ipnet = "2.8"
+chrono = "0.4"
+
+[profile.minsize]
+inherits = "release"
+strip = true
+opt-level = "s"
+lto = "fat"
+panic = "abort"
+
+[package.metadata.deb]
+maintainer = "Matthias Hecker <mail@mattzq.com>"
+copyright = "2023, Matthias Hecker <mail@mattzq.com>"
+license-file = ["LICENSE", "2"]
+extended-description = """\
+A Wireguard configuration system using a lighthouse and nodes. \
+For use with small wireguard mesh networks."""
+depends = "wireguard (>= 1.0.0)"
+section = "utility"
+priority = "optional"
+conf-files = [
+    "/etc/wgpull/wgpull.conf"
+]
+assets = [
+    ["target/release/wgpull-lighthouse", "usr/bin/", "755"],
+    ["target/release/wgpull-node", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/wgpull/README", "644"],
+    ["package/debian/wgpull.conf", "etc/wgpull/wgpull.conf", "600"],
+]
+maintainer-scripts = "package/debian/"
+systemd-units = [ 
+    { unit-name = "wgpull-lighthouse", enable = false },
+    { unit-name = "wgpull-node", enable = false } 
+] 

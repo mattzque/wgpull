@@ -1,0 +1,31 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  storage:
+    swap:
+      size: 0
+    layout:
+      name: lvm
+  ssh:
+    allow-pw: true
+    install-server: true
+  packages:
+  - qemu-guest-agent
+  identity:
+    hostname: ubuntu
+    username: admin
+    # password: Chae9cahb5
+    password: '$2b$12$VZBdGgdx8pIONJro/9GfLu0wfG8u3yrHH7NRixoQk9Yl4ZZikd6Vu'
+
+  # allow admin user to sudo without password
+  late-commands:
+    - sed -ie 's/GRUB_TIMEOUT=.\*/GRUB_TIMEOUT=30/' /target/etc/default/grub
+    - "echo 'admin ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/admin"
+    - "chmod 440 /target/etc/sudoers.d/admin"
+    - mkdir /target/root/.ssh
+    - chmod 700 /target/root/.ssh
+    - echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFJwmYluHkx0tKTJKExCh+LI7jcoI/DvZhyDE8Uw9en3" >> /target/root/.ssh/authorized_keys
+    - chmod 600 /target/root/.ssh/authorized_keys

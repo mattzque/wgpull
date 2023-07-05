@@ -1,0 +1,15 @@
+[Unit]
+Description=Wireguard Pull Configuration Node
+After=network-online.target
+Requires=systemd-networkd.service
+
+[Service]
+ExecStart=/usr/bin/wgpull-node
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=60s
+StartLimitBurst=3
+User=root
+
+[Install]
+WantedBy=default.target

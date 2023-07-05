@@ -1,0 +1,5 @@
+*-initramfs
+*.qcow2
+*.pid
+qemu/openwrt/image
+.venv
