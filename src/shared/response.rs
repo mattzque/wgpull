@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::validation::{
-    validate_cidr, validate_hostname, validate_hostname_or_ip, validate_wg_key, ValidationError,
+    validate_cidr, validate_hostname, validate_hostname_or_ip, validate_wg_key, Validated,
+    ValidationError,
 };
 
 /// The request sent by a node to the lighthouse.
@@ -43,9 +44,9 @@ pub struct NodePullResponse {
     pub peers: Vec<NodePullResponsePeer>,
 }
 
-impl NodePullResponse {
+impl Validated for NodePullResponse {
     /// Validates the pull response, returns true if valid, false otherwise.
-    pub fn validate(&self) -> Result<(), ValidationError> {
+    fn validate(&self) -> Result<(), ValidationError> {
         for peer in &self.peers {
             validate_hostname("hostname", &peer.hostname)?;
             validate_wg_key("public_key", &peer.public_key)?;

@@ -1,5 +1,7 @@
 use anyhow::Result;
+use log::error;
 use serde::Serialize;
+use shared_lib::validation::Validated;
 use std::time::Duration;
 use thiserror::Error;
 use ureq::Agent;
@@ -21,6 +23,8 @@ pub enum AgentError {
     ChallengeResponseIncorrect,
     #[error("Challenge Response Missing in response")]
     NoChallengeResponse,
+    #[error("Error validating request to send")]
+    RequestValidationError,
 }
 
 pub struct NodeAgent {
@@ -48,11 +52,15 @@ impl NodeAgent {
         })
     }
 
-    pub fn post<T: Serialize>(
+    pub fn post<T: Serialize + Validated>(
         &self,
         path: &'static str,
         request: &T,
     ) -> Result<String, AgentError> {
+        request.validate().map_err(|err| {
+            error!("Error validating the request to send: {}", err.to_string());
+            AgentError::RequestValidationError
+        })?;
         let body = serde_json::to_string(request)
             .map_err(|err| AgentError::ClientSerializationError(err.to_string()))?;
 
@@ -88,8 +96,6 @@ impl NodeAgent {
     }
 
     pub fn pull_wireguard(&self, request: NodePullRequest) -> Result<NodePullResponse> {
-        request.validate()?;
-
         let response = self.post("api/v1/pull", &request)?;
 
         let response: NodePullResponse = serde_json::from_str(&response)
@@ -101,8 +107,6 @@ impl NodeAgent {
     }
 
     pub fn push_metrics(&self, request: NodeMetricsPushRequest) -> Result<()> {
-        request.validate()?;
-
         self.post("api/v1/push", &request)?;
 
         Ok(())

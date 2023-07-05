@@ -7,6 +7,7 @@ use gotham::prelude::*;
 use gotham::state::State;
 use log::{error, info};
 use shared_lib::time::CurrentSystemTime;
+use shared_lib::validation::Validated;
 use std::pin::Pin;
 
 use crate::lighthouse::context::LighthouseContext;

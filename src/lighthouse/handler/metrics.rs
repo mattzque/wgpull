@@ -9,6 +9,7 @@ use gotham::state::State;
 use log::error;
 use shared_lib::headers::HEADER_NODE_RESPONSE;
 use shared_lib::request::NodeMetricsPushRequest;
+use shared_lib::validation::Validated;
 use std::pin::Pin;
 
 use super::helpers::{get_challenge_response, verify_lighthouse_key};

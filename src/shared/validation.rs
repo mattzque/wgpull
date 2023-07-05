@@ -12,6 +12,11 @@ pub enum ValidationError {
     InvalidFormat(&'static str, &'static str),
 }
 
+pub trait Validated {
+    /// Validates itself, resulting in a `ValidationError` whenever a validation rule fails.
+    fn validate(&self) -> Result<(), ValidationError>;
+}
+
 pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), ValidationError> {
     if hostname.len() > 253 {
         return Err(ValidationError::InvalidFormat(

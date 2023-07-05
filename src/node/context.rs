@@ -6,6 +6,7 @@ use log::info;
 use shared_lib::{
     command::SystemCommandExecutor,
     request::{NodeMetricsPushRequest, NodeMetricsPushRequestPeer, NodePullRequest},
+    validation::Validated,
     wg::{WireguardCommand, WireguardInfo},
 };
 use std::sync::{Arc, Mutex};
