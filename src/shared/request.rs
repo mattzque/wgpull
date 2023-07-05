@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::validation::{ValidationError, validate_hostname, validate_wg_key, validate_hostname_or_ip, validate_cidr, validate_interface_name};
+
 
 /// The request sent by a node to the lighthouse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +22,19 @@ pub struct NodePullRequest {
     pub route_allowed_ips: bool,
 }
 
+impl NodePullRequest {
+    /// Validates the pull response, returns true if valid, false otherwise.
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        validate_hostname("hostname", &self.hostname)?;
+        validate_hostname_or_ip("endpoint", &self.endpoint)?;
+        validate_wg_key("public_key", &self.public_key)?;
+        for allowed_ip in &self.allowed_ips {
+            validate_cidr("allowed_ip[]", allowed_ip)?;
+        }
+        Ok(())
+    }
+}
+
 /// Wireguard metrics for a peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeMetricsPushRequestPeer {
@@ -28,9 +43,6 @@ pub struct NodeMetricsPushRequestPeer {
 
     /// Endpoint of the peer.
     pub endpoint: String,
-
-    /// Allowed IPs of the peer.
-    pub allowed_ips: String,
 
     /// Latest handshake of the peer.
     pub latest_handshake: u64,
@@ -59,4 +71,17 @@ pub struct NodeMetricsPushRequest {
 
     /// Information about connected peers.
     pub peers: Vec<NodeMetricsPushRequestPeer>,
+}
+
+impl NodeMetricsPushRequest {
+    /// Validates the pull response, returns true if valid, false otherwise.
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        validate_hostname("hostname", &self.hostname)?;
+        validate_interface_name("interface", &self.interface)?;
+        for peer in &self.peers {
+            validate_hostname("hostname", &peer.hostname)?;
+            validate_hostname_or_ip("endpoint", &peer.endpoint)?;
+        }
+        Ok(())
+    }
 }

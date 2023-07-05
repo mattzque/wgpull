@@ -88,15 +88,21 @@ impl NodeAgent {
     }
 
     pub fn pull_wireguard(&self, request: NodePullRequest) -> Result<NodePullResponse> {
+        request.validate()?;
+
         let response = self.post("api/v1/pull", &request)?;
 
         let response: NodePullResponse = serde_json::from_str(&response)
             .map_err(|err| AgentError::ClientSerializationError(err.to_string()))?;
 
+        response.validate()?;
+
         Ok(response)
     }
 
     pub fn push_metrics(&self, request: NodeMetricsPushRequest) -> Result<()> {
+        request.validate()?;
+
         self.post("api/v1/push", &request)?;
 
         Ok(())

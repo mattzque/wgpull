@@ -36,6 +36,11 @@ pub fn post_metrics_handler(mut state: State) -> Pin<Box<HandlerFuture>> {
 
             let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
             let request: NodeMetricsPushRequest = serde_json::from_str(&body_content).unwrap();
+            if let Err(err) = request.validate() {
+                error!("Error validating metrics request: {}", err);
+                let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
+                return future::ok((state, res));
+            }
 
             if let Err(err) = context.update_metrics(&request) {
                 error!("Error updating metrics: {}", err);

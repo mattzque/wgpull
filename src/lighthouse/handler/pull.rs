@@ -5,7 +5,7 @@ use gotham::hyper::{body, Body, HeaderMap, StatusCode};
 use gotham::prelude::*;
 use gotham::mime;
 use gotham::state::State;
-use log::info;
+use log::{info, error};
 use shared_lib::time::CurrentSystemTime;
 use std::pin::Pin;
 
@@ -41,9 +41,24 @@ pub fn post_pull_handler(mut state: State) -> Pin<Box<HandlerFuture>> {
 
             let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
             let request: NodePullRequest = serde_json::from_str(&body_content).unwrap();
+            if let Err(err) = request.validate() {
+                error!("Error validating node pull request: {}", err);
+                let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
+                return future::ok((state, res));
+            }
             let response = context.node_pull(&request, &time);
-
+            if let Err(err) = response {
+                error!("Error creating pull response: {}", err);
+                let res = create_empty_response(&state, StatusCode::INTERNAL_SERVER_ERROR);
+                return future::ok((state, res));
+            }
             let response = response.unwrap();
+            if let Err(err) = response.validate() {
+                error!("Error validating node pull response: {}", err);
+                let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
+                return future::ok((state, res));
+            }
+
             let response_json = serde_json::to_string(&response).unwrap();
 
             // create response with challenge response header:

@@ -86,7 +86,6 @@ impl NodeContext {
             .map(|peer| NodeMetricsPushRequestPeer {
                 hostname: state.get_hostname_by_public_key(&peer.public_key),
                 endpoint: peer.endpoint,
-                allowed_ips: peer.allowed_ips,
                 latest_handshake: peer.latest_handshake,
                 transfer_rx: peer.transfer_rx,
                 transfer_tx: peer.transfer_tx,
@@ -100,6 +99,7 @@ impl NodeContext {
             listening_port: info.listening_port,
             peers,
         };
+        request.validate()?;
         Ok(request)
     }
 
