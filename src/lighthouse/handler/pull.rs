@@ -1,83 +1,34 @@
-use futures_util::future::{self, FutureExt};
-use gotham::handler::HandlerFuture;
-use gotham::helpers::http::response::{create_empty_response, create_response};
-use gotham::hyper::{body, Body, HeaderMap, StatusCode};
-use gotham::mime;
-use gotham::prelude::*;
-use gotham::state::State;
-use log::{error, info};
-use shared_lib::time::CurrentSystemTime;
-use shared_lib::validation::Validated;
-use std::pin::Pin;
-
-use crate::lighthouse::context::LighthouseContext;
-use crate::lighthouse::handler::helpers::{get_challenge_response, verify_lighthouse_key};
-use shared_lib::headers::HEADER_NODE_RESPONSE;
+use super::LighthouseResponseError;
+use crate::lighthouse::context::LighthouseContextProvider;
+use axum::extract::State;
+use axum::Json;
+use axum_macros::debug_handler;
+use log::error;
 use shared_lib::request::NodePullRequest;
+use shared_lib::response::NodePullResponse;
+use shared_lib::validation::Validated;
 
-pub fn post_pull_handler(mut state: State) -> Pin<Box<HandlerFuture>> {
-    let f = body::to_bytes(Body::take_from(&mut state)).then(|full_body| match full_body {
-        Ok(valid_body) => {
-            let context = LighthouseContext::borrow_from(&state);
-            let headers = HeaderMap::borrow_from(&state);
+#[debug_handler]
+pub async fn post_pull_handler(
+    State(context): State<LighthouseContextProvider>,
+    Json(request): Json<NodePullRequest>,
+) -> Result<Json<NodePullResponse>, LighthouseResponseError> {
+    if request.validate().is_err() {
+        return Err(LighthouseResponseError::BadRequestBody);
+    }
 
-            info!("received pull request from node");
+    let mut context = context.context.lock().await;
 
-            // verify the lighthouse key
-            if !verify_lighthouse_key(context, headers) {
-                let res = create_empty_response(&state, StatusCode::UNAUTHORIZED);
-                return future::ok((state, res));
-            }
+    let response = context.node_pull(&request).await;
+    if let Err(err) = response {
+        error!("Error creating pull response: {}", err);
+        return Err(LighthouseResponseError::InternalError);
+    }
+    let response = response.unwrap();
+    if let Err(err) = response.validate() {
+        error!("Error validating node pull response: {}", err);
+        return Err(LighthouseResponseError::BadResponseBody);
+    }
 
-            // prepare the challenge response
-            let challenge_response = match get_challenge_response(context, headers) {
-                Some(response) => response,
-                None => {
-                    let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
-                    return future::ok((state, res));
-                }
-            };
-
-            let time = CurrentSystemTime::default();
-
-            let body_content = String::from_utf8(valid_body.to_vec()).unwrap();
-            let request: NodePullRequest = serde_json::from_str(&body_content).unwrap();
-            if let Err(err) = request.validate() {
-                error!("Error validating node pull request: {}", err);
-                let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
-                return future::ok((state, res));
-            }
-            let response = context.node_pull(&request, &time);
-            if let Err(err) = response {
-                error!("Error creating pull response: {}", err);
-                let res = create_empty_response(&state, StatusCode::INTERNAL_SERVER_ERROR);
-                return future::ok((state, res));
-            }
-            let response = response.unwrap();
-            if let Err(err) = response.validate() {
-                error!("Error validating node pull response: {}", err);
-                let res = create_empty_response(&state, StatusCode::BAD_REQUEST);
-                return future::ok((state, res));
-            }
-
-            let response_json = serde_json::to_string(&response).unwrap();
-
-            // create response with challenge response header:
-            let mut res = create_response(
-                &state,
-                StatusCode::OK,
-                mime::APPLICATION_JSON,
-                response_json,
-            );
-            res.headers_mut().insert(
-                HEADER_NODE_RESPONSE,
-                challenge_response.as_str().parse().unwrap(),
-            );
-
-            future::ok((state, res))
-        }
-        Err(e) => future::err((state, e.into())),
-    });
-
-    f.boxed()
+    Ok(Json(response))
 }

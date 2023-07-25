@@ -1,6 +1,7 @@
 pub mod challenge;
 pub mod command;
 pub mod config;
+pub mod file;
 pub mod headers;
 pub mod logger;
 pub mod request;

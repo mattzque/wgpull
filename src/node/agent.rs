@@ -1,10 +1,11 @@
 use anyhow::Result;
+use axum::http::{HeaderMap, HeaderValue};
 use log::error;
+use reqwest::Client;
 use serde::Serialize;
 use shared_lib::validation::Validated;
 use std::time::Duration;
 use thiserror::Error;
-use ureq::Agent;
 
 use shared_lib::challenge::ChallengeResponse;
 use shared_lib::headers::{HEADER_LIGHTHOUSE_KEY, HEADER_NODE_CHALLENGE, HEADER_NODE_RESPONSE};
@@ -31,12 +32,14 @@ pub struct NodeAgent {
     lighthouse_url: String,
     lighthouse_key: String,
     node_key: String,
-    agent: Agent,
+    client: Client,
 }
 
 impl NodeAgent {
     pub fn from_node_config(config: &NodeConfig) -> Result<Self> {
-        let agent = ureq::builder().timeout(Duration::from_secs(10)).build();
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()?;
 
         Ok(Self {
             lighthouse_url: format!(
@@ -48,11 +51,11 @@ impl NodeAgent {
             ),
             lighthouse_key: config.lighthouse_key.clone(),
             node_key: config.node_key.clone(),
-            agent,
+            client,
         })
     }
 
-    pub fn post<T: Serialize + Validated>(
+    pub async fn post<T: Serialize + Validated>(
         &self,
         path: &'static str,
         request: &T,
@@ -65,19 +68,32 @@ impl NodeAgent {
             .map_err(|err| AgentError::ClientSerializationError(err.to_string()))?;
 
         let challenge = ChallengeResponse::new(self.node_key.clone());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HEADER_LIGHTHOUSE_KEY,
+            HeaderValue::from_str(&self.lighthouse_key).unwrap(),
+        );
+        headers.insert(
+            HEADER_NODE_CHALLENGE,
+            HeaderValue::from_str(challenge.challenge().as_str()).unwrap(),
+        );
+        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+
         let resp = self
-            .agent
-            .post(format!("{}{}", self.lighthouse_url, path).as_str())
-            .set(HEADER_LIGHTHOUSE_KEY, &self.lighthouse_key)
-            .set(HEADER_NODE_CHALLENGE, challenge.challenge().as_str())
-            .send_string(&body);
+            .client
+            .post(format!("{}{}", self.lighthouse_url, path))
+            .headers(headers)
+            .body(body)
+            .send()
+            .await;
 
         match resp {
             Ok(resp) => {
-                if resp.status() == 200 {
-                    if let Some(challenge_response) = resp.header(HEADER_NODE_RESPONSE) {
-                        if challenge.verify(challenge_response) {
-                            Ok(resp.into_string().unwrap())
+                if resp.status().is_success() {
+                    if let Some(challenge_response) = resp.headers().get(HEADER_NODE_RESPONSE) {
+                        if challenge.verify(challenge_response.to_str().unwrap()) {
+                            Ok(resp.text().await.unwrap())
                         } else {
                             Err(AgentError::ChallengeResponseIncorrect)
                         }
@@ -95,8 +111,8 @@ impl NodeAgent {
         }
     }
 
-    pub fn pull_wireguard(&self, request: NodePullRequest) -> Result<NodePullResponse> {
-        let response = self.post("api/v1/pull", &request)?;
+    pub async fn pull_wireguard(&self, request: NodePullRequest) -> Result<NodePullResponse> {
+        let response = self.post("api/v1/pull", &request).await?;
 
         let response: NodePullResponse = serde_json::from_str(&response)
             .map_err(|err| AgentError::ClientSerializationError(err.to_string()))?;
@@ -106,8 +122,8 @@ impl NodeAgent {
         Ok(response)
     }
 
-    pub fn push_metrics(&self, request: NodeMetricsPushRequest) -> Result<()> {
-        self.post("api/v1/push", &request)?;
+    pub async fn push_metrics(&self, request: NodeMetricsPushRequest) -> Result<()> {
+        self.post("api/v1/push", &request).await?;
 
         Ok(())
     }

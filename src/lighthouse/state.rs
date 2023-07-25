@@ -3,21 +3,17 @@ use chrono::prelude::Timelike;
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{collections::HashMap, fs::File, io::Read, time::SystemTime};
-use thiserror::Error;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    time::SystemTime,
+};
 
 use shared_lib::{
-    command::CommandExecutor, request::NodePullRequest, response::NodePullResponsePeer,
-    time::CurrentTime, wg::WireguardCommand,
+    command::CommandExecutor, file::FileAccessor, request::NodePullRequest,
+    response::NodePullResponsePeer, time::CurrentTime, wg::WireguardCommand,
 };
 
 use super::peer_pair::PeerPair;
-
-#[derive(Error, Debug)]
-pub enum LighthouseError {
-    #[error("State Lock Poisoned")]
-    StateLockPoisoned,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LighthouseNodeLease {
@@ -80,16 +76,15 @@ pub struct LighthouseState {
 }
 
 impl LighthouseState {
-    pub fn from_file(path: &str) -> Result<Option<LighthouseState>> {
-        let mut file = match File::open(path) {
-            Ok(file) => file,
+    pub async fn from_file(
+        path: &str,
+        accessor: &dyn FileAccessor,
+    ) -> Result<Option<LighthouseState>> {
+        info!("Restoring lighthouse state from {}", path);
+        let contents = match accessor.read(path).await {
+            Ok(contents) => contents,
             Err(_) => return Ok(None),
         };
-
-        info!("Restoring lighthouse state from {}", path);
-
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
 
         let state = match toml::from_str(&contents) {
             Ok(state) => state,
@@ -99,20 +94,21 @@ impl LighthouseState {
         Ok(Some(state))
     }
 
-    pub fn save(&self, path: &str) -> Result<()> {
+    pub async fn save(&self, path: &str, accessor: &dyn FileAccessor) -> Result<()> {
         info!("Saving lighthouse state to {}", path);
         // Convert the state to a TOML string.
         let content = toml::to_string(self)?;
         // Write the TOML string to the state file.
-        std::fs::write(path, content)?;
+        accessor.write(path, &content).await?;
         Ok(())
     }
 
     /// Update or insert a node lease from a pull request.
-    pub fn upsert_node_lease_from_pull_request<T>(&mut self, request: &NodePullRequest, time: &T)
-    where
-        T: CurrentTime,
-    {
+    pub fn upsert_node_lease_from_pull_request(
+        &mut self,
+        request: &NodePullRequest,
+        time: &dyn CurrentTime,
+    ) {
         // get oldest last rotation in nodes:
         let last_rotation = self
             .nodes
@@ -160,47 +156,53 @@ impl LighthouseState {
         }
     }
 
-    pub fn get_peers_response_for_node<T>(
+    pub async fn get_peers_response_for_node<T>(
         &mut self,
         hostname: &str,
         executor: T,
     ) -> Vec<NodePullResponsePeer>
     where
-        T: CommandExecutor,
+        T: CommandExecutor + Send + Sync,
     {
         let wireguard_command = WireguardCommand::new(executor);
 
-        let mut peers: Vec<NodePullResponsePeer> = self
-            .nodes
-            .values()
-            .filter(|node| node.hostname != hostname)
-            .map(|node| {
+        let mut peers: Vec<NodePullResponsePeer> = Vec::new();
+
+        for node in self.nodes.values() {
+            if node.hostname != hostname {
                 // create or retrieve pre-shared key for this peer pair:
                 info!(
                     "Creating or retrieving pre-shared key for peer pair: {} and {}",
                     hostname, node.hostname
                 );
-                let preshared_key = self
+
+                let preshared_key = match self
                     .preshared_keys
                     .entry(PeerPair::new(hostname.to_string(), node.hostname.clone()))
-                    .or_insert_with(|| {
-                        wireguard_command
+                {
+                    Entry::Occupied(entry) => entry.get().clone(),
+                    Entry::Vacant(entry) => {
+                        let psk = wireguard_command
                             .generate_psk()
-                            .expect("Lighthouse failed to generate pre-shared key.")
-                    });
+                            .await
+                            .expect("Lighthouse failed to generate pre-shared key.");
+                        entry.insert(psk.clone());
+                        psk
+                    }
+                };
 
-                NodePullResponsePeer {
+                peers.push(NodePullResponsePeer {
                     hostname: node.hostname.clone(),
                     public_key: node.public_key.clone(),
-                    preshared_key: preshared_key.clone(),
+                    preshared_key,
                     endpoint_host: node.endpoint_host.clone(),
                     endpoint_port: node.endpoint_port,
                     allowed_ips: node.allowed_ips.clone(),
                     persistent_keepalive: node.persistent_keepalive,
                     route_allowed_ips: node.route_allowed_ips,
-                }
-            })
-            .collect();
+                });
+            }
+        }
 
         // sort peers by hostname:
         peers.sort_by(|a, b| a.hostname.cmp(&b.hostname));
@@ -219,7 +221,7 @@ impl LighthouseState {
             return Ok(false);
         }
 
-        if let Some(mut node) = self.nodes.get_mut(hostname) {
+        if let Some(node) = self.nodes.get_mut(hostname) {
             let now = time.now();
             let hour = time.now_chrono().hour() as u8;
             let duration = now.duration_since(node.last_rotation)?;

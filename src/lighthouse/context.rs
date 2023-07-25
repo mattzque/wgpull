@@ -1,41 +1,39 @@
 use anyhow::Result;
-use gotham::state::StateData;
 use shared_lib::{
     challenge::ChallengeResponse,
     command::SystemCommandExecutor,
+    file::FileAccessor,
     request::{NodeMetricsPushRequest, NodePullRequest},
     response::NodePullResponse,
     time::CurrentTime,
 };
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 
-use super::{
-    config::LighthouseConfig,
-    metrics::LighthouseMetrics,
-    state::{LighthouseError, LighthouseState},
-};
+use super::{config::LighthouseConfig, metrics::LighthouseMetrics, state::LighthouseState};
 
-#[derive(Clone, StateData)]
 pub struct LighthouseContext {
     pub config: LighthouseConfig,
-    pub state: Arc<Mutex<LighthouseState>>,
-    pub metrics: Arc<Mutex<LighthouseMetrics>>,
+    pub state: LighthouseState,
+    pub metrics: LighthouseMetrics,
+    pub time: Box<dyn CurrentTime + Send + Sync>,
+    pub file_accessor: Box<dyn FileAccessor + Send + Sync>,
 }
 
 impl LighthouseContext {
-    pub fn init<T>(config: LighthouseConfig, time: &T) -> Result<Self>
-    where
-        T: CurrentTime,
-    {
-        match LighthouseState::from_file(&config.state_file)? {
+    pub async fn init(
+        config: LighthouseConfig,
+        time: Box<dyn CurrentTime + Send + Sync>,
+        file_accessor: Box<dyn FileAccessor + Send + Sync>,
+    ) -> Result<Self> {
+        match LighthouseState::from_file(&config.state_file, file_accessor.as_ref()).await? {
             Some(state) => {
                 let context = LighthouseContext {
                     config,
-                    state: Arc::new(Mutex::new(state)),
-                    metrics: Arc::new(Mutex::new(LighthouseMetrics::default())),
+                    state,
+                    metrics: LighthouseMetrics::default(),
+                    time,
+                    file_accessor,
                 };
                 Ok(context)
             }
@@ -47,8 +45,10 @@ impl LighthouseContext {
                 };
                 let context = LighthouseContext {
                     config,
-                    state: Arc::new(Mutex::new(state)),
-                    metrics: Arc::new(Mutex::new(LighthouseMetrics::default())),
+                    state,
+                    metrics: LighthouseMetrics::default(),
+                    time,
+                    file_accessor,
                 };
                 Ok(context)
             }
@@ -63,56 +63,57 @@ impl LighthouseContext {
         ChallengeResponse::with_challenge(self.config.node_key.clone(), challenge).response()
     }
 
-    pub fn node_pull<T>(&self, request: &NodePullRequest, time: &T) -> Result<NodePullResponse>
-    where
-        T: CurrentTime,
-    {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| LighthouseError::StateLockPoisoned)?;
-
+    pub async fn node_pull(&mut self, request: &NodePullRequest) -> Result<NodePullResponse> {
         // insert or update the node in the lighthouse state, updating the last_seen time
-        state.upsert_node_lease_from_pull_request(request, time);
+        self.state
+            .upsert_node_lease_from_pull_request(request, self.time.as_ref());
 
         // retreive the regenerate key flag, this also sets the last rotation
         //   time on the node lease
-        let regenerate_keys = state.should_regenerate_keys(
+        let regenerate_keys = self.state.should_regenerate_keys(
             &request.hostname,
             self.config.key_rotation_interval_seconds,
             self.config.key_rotation_tod,
-            time,
+            self.time.as_ref(),
         )?;
 
-        state.remove_expired_nodes(self.config.node_timeout_seconds, time);
+        self.state
+            .remove_expired_nodes(self.config.node_timeout_seconds, self.time.as_ref());
 
-        state.save(&self.config.state_file)?;
+        self.state
+            .save(&self.config.state_file, self.file_accessor.as_ref())
+            .await?;
 
         Ok(NodePullResponse {
             regenerate_keys,
-            peers: state
-                .get_peers_response_for_node(&request.hostname, SystemCommandExecutor::default()),
+            peers: self
+                .state
+                .get_peers_response_for_node(&request.hostname, SystemCommandExecutor)
+                .await,
         })
     }
 
-    pub fn update_metrics(&self, request: &NodeMetricsPushRequest) -> Result<()> {
-        let mut metrics = self
-            .metrics
-            .lock()
-            .map_err(|_| LighthouseError::StateLockPoisoned)?;
-
+    pub fn update_metrics(&mut self, request: &NodeMetricsPushRequest) -> Result<()> {
         // insert or update the node in the lighthouse state, updating the last_seen time
-        metrics.upsert_metrics(request);
+        self.metrics.upsert_metrics(request);
 
         Ok(())
     }
 
     pub fn get_metrics_prometheus_export(&self) -> Result<String> {
-        let metrics = self
-            .metrics
-            .lock()
-            .map_err(|_| LighthouseError::StateLockPoisoned)?;
+        Ok(self.metrics.export_prometheus())
+    }
+}
 
-        Ok(metrics.export_prometheus())
+#[derive(Clone)]
+pub struct LighthouseContextProvider {
+    pub context: Arc<Mutex<LighthouseContext>>,
+}
+
+impl LighthouseContextProvider {
+    pub fn new(context: LighthouseContext) -> Self {
+        LighthouseContextProvider {
+            context: Arc::new(Mutex::new(context)),
+        }
     }
 }

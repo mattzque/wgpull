@@ -3,17 +3,14 @@ use anyhow::Result;
 use log::info;
 use serde::{Deserialize, Serialize};
 use shared_lib::{
-    command::SystemCommandExecutor, request::NodePullRequest, response::NodePullResponse,
-    wg::WireguardCommand,
+    command::SystemCommandExecutor, file::FileAccessor, request::NodePullRequest,
+    response::NodePullResponse, wg::WireguardCommand,
 };
-use std::{fs::File, io::Read};
 
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum NodeError {
-    #[error("State Lock Poisoned")]
-    StateLockPoisoned,
     #[error("The configured backend is not compatible with this system")]
     BackendNotCompatible,
 }
@@ -103,12 +100,12 @@ impl NodeState {
             .unwrap_or("<unknown>".to_string())
     }
 
-    pub fn from_wireguard_config(config: &NodeConfigFile) -> Result<Self> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor::default());
+    pub async fn from_wireguard_config(config: &NodeConfigFile) -> Result<Self> {
+        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
 
-        let keypair = wireguard_command.generate_keypair()?;
+        let keypair = wireguard_command.generate_keypair().await?;
         let endpoint = if config.wireguard.endpoint == "discover" {
-            let public_ip = discover_public_ip()?;
+            let public_ip = discover_public_ip().await?;
             info!("Using public ip discovery for node endpoint: {}", public_ip);
             public_ip
         } else {
@@ -118,10 +115,10 @@ impl NodeState {
         let hostname = {
             // get backend by configuration
             let backend = get_backend_impl(config.wireguard.backend.clone(), config);
-            if !backend.is_compatible() {
+            if !backend.is_compatible().await {
                 return Err(NodeError::BackendNotCompatible.into());
             }
-            backend.get_hostname()?
+            backend.get_hostname().await?
         };
 
         Ok(NodeState {
@@ -138,13 +135,13 @@ impl NodeState {
         })
     }
 
-    pub fn update_from_pull_response(&mut self, response: &NodePullResponse) -> Result<()> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor::default());
+    pub async fn update_from_pull_response(&mut self, response: &NodePullResponse) -> Result<()> {
+        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
 
         if response.regenerate_keys {
             info!("Regenerating keys as requested by lighthouse.");
             // generate new keys
-            let keypair = wireguard_command.generate_keypair()?;
+            let keypair = wireguard_command.generate_keypair().await?;
             self.private_key = keypair.private_key;
             self.public_key = keypair.public_key;
             // TODO the generated keys will not be known by the lighthouse, so we need to do
@@ -171,16 +168,12 @@ impl NodeState {
         Ok(())
     }
 
-    pub fn from_file(path: &str) -> Result<Option<NodeState>> {
-        let mut file = match File::open(path) {
+    pub async fn from_file(path: &str, accessor: &dyn FileAccessor) -> Result<Option<NodeState>> {
+        info!("Restoring node state from {}", path);
+        let contents = match accessor.read(path).await {
             Ok(file) => file,
             Err(_) => return Ok(None),
         };
-
-        info!("Restoring node state from {}", path);
-
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
 
         let state = match toml::from_str(&contents) {
             Ok(state) => state,
@@ -190,12 +183,12 @@ impl NodeState {
         Ok(Some(state))
     }
 
-    pub fn save(&self, path: &str) -> Result<()> {
+    pub async fn save(&self, path: &str, accessor: &dyn FileAccessor) -> Result<()> {
         info!("Saving node state to {}", path);
         // Convert the state to a TOML string.
-        let state = toml::to_string(self)?;
+        let contents = toml::to_string(self)?;
         // Write the TOML string to the state file.
-        std::fs::write(path, state)?;
+        accessor.write(path, &contents).await?;
 
         Ok(())
     }

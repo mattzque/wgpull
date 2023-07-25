@@ -5,6 +5,7 @@ use super::{
 };
 use crate::node::state::NodeState;
 use anyhow::Result;
+use axum::async_trait;
 use log::info;
 use shared_lib::command::CommandExecutor;
 
@@ -22,12 +23,13 @@ impl<T: CommandExecutor> UciBackend<T> {
     }
 }
 
+#[async_trait]
 impl<T: CommandExecutor> Backend for UciBackend<T> {
-    fn is_compatible(&self) -> bool {
-        self.command.test_uci()
+    async fn is_compatible(&self) -> bool {
+        self.command.test_uci().await
     }
 
-    fn update_local_state(&self, state: &NodeState) -> Result<bool> {
+    async fn update_local_state(&self, state: &NodeState) -> Result<bool> {
         let uci_peers = state
             .peers
             .iter()
@@ -49,8 +51,10 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
             peers: uci_peers,
         };
 
-        let changed = if let Ok(current_uci_config) =
-            self.command.get_wireguard_config(&self.config.interface)
+        let changed = if let Ok(current_uci_config) = self
+            .command
+            .get_wireguard_config(&self.config.interface)
+            .await
         {
             info!(
                 "current_uci_config.peers: {}",
@@ -68,8 +72,9 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
                 uci_config.peers.len()
             );
             self.command
-                .update_wireguard_config(&self.config.interface, &uci_config)?;
-            self.command.commit(&self.config.interface)?;
+                .update_wireguard_config(&self.config.interface, &uci_config)
+                .await?;
+            self.command.commit(&self.config.interface).await?;
             Ok(true)
         } else {
             info!(
@@ -80,8 +85,8 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
         }
     }
 
-    fn get_hostname(&self) -> Result<String> {
-        let hostname = self.command.get_hostname()?;
+    async fn get_hostname(&self) -> Result<String> {
+        let hostname = self.command.get_hostname().await?;
         Ok(hostname)
     }
 }

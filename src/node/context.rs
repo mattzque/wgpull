@@ -1,61 +1,57 @@
 use super::{agent::NodeAgent, config::NodeConfigFile, state::NodeState};
 use crate::node::{backend::get_backend_impl, state::NodeError};
 use anyhow::Result;
-use gotham::state::StateData;
 use log::info;
 use shared_lib::{
     command::SystemCommandExecutor,
+    file::FileAccessor,
     request::{NodeMetricsPushRequest, NodeMetricsPushRequestPeer, NodePullRequest},
     validation::Validated,
     wg::{WireguardCommand, WireguardInfo},
 };
-use std::sync::{Arc, Mutex};
 
-#[derive(Clone, StateData)]
 pub struct NodeContext {
     pub config: NodeConfigFile,
-    pub state: Arc<Mutex<NodeState>>,
-    pub agent: Arc<Mutex<NodeAgent>>,
+    pub state: NodeState,
+    pub agent: NodeAgent,
+    pub file_accessor: Box<dyn FileAccessor>,
 }
 
 impl NodeContext {
-    pub fn init(config: &NodeConfigFile) -> Result<Self> {
-        match NodeState::from_file(&config.node.state_file)? {
+    pub async fn init(
+        config: &NodeConfigFile,
+        file_accessor: Box<dyn FileAccessor>,
+    ) -> Result<Self> {
+        match NodeState::from_file(&config.node.state_file, file_accessor.as_ref()).await? {
             Some(state) => {
                 let context = NodeContext {
                     config: config.clone(),
-                    state: Arc::new(Mutex::new(state)),
-                    agent: Arc::new(Mutex::new(NodeAgent::from_node_config(&config.node)?)),
+                    state,
+                    agent: NodeAgent::from_node_config(&config.node)?,
+                    file_accessor,
                 };
                 Ok(context)
             }
             None => {
                 info!("Local node has no state, generating new wireguard keys.");
-                let state = NodeState::from_wireguard_config(config)?;
+                let state = NodeState::from_wireguard_config(config).await?;
                 let context = NodeContext {
                     config: config.clone(),
-                    state: Arc::new(Mutex::new(state)),
-                    agent: Arc::new(Mutex::new(NodeAgent::from_node_config(&config.node)?)),
+                    state,
+                    agent: NodeAgent::from_node_config(&config.node)?,
+                    file_accessor,
                 };
                 Ok(context)
             }
         }
     }
 
-    pub fn pull_wireguard(&self) -> Result<()> {
+    pub async fn pull_wireguard(&mut self) -> Result<()> {
         info!("Pulling Wireguard configuration.");
         // Lock the state to ensure exclusive access.
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| NodeError::StateLockPoisoned)?;
-        let agent = self
-            .agent
-            .lock()
-            .map_err(|_| NodeError::StateLockPoisoned)?;
 
-        let request: NodePullRequest = state.clone().into();
-        let response = agent.pull_wireguard(request)?;
+        let request: NodePullRequest = self.state.clone().into();
+        let response = self.agent.pull_wireguard(request).await?;
 
         info!(
             "Received configuration of {} peers from lighthouse.",
@@ -63,19 +59,21 @@ impl NodeContext {
         );
 
         // update state from response, replacing all peers and regenerate keys if requested
-        state.update_from_pull_response(&response)?;
+        self.state.update_from_pull_response(&response).await?;
 
         // get backend by configuration
         let backend = get_backend_impl(self.config.wireguard.backend.clone(), &self.config);
-        if !backend.is_compatible() {
+        if !backend.is_compatible().await {
             return Err(NodeError::BackendNotCompatible.into());
         }
 
         // configure the local system to match the state
-        backend.update_local_state(&state)?;
+        backend.update_local_state(&self.state).await?;
 
         // save state to disk
-        state.save(&self.config.node.state_file)?;
+        self.state
+            .save(&self.config.node.state_file, self.file_accessor.as_ref())
+            .await?;
 
         Ok(())
     }
@@ -84,15 +82,11 @@ impl NodeContext {
         &self,
         info: WireguardInfo,
     ) -> Result<NodeMetricsPushRequest> {
-        let state = self
-            .state
-            .lock()
-            .map_err(|_| NodeError::StateLockPoisoned)?;
         let peers = info
             .peers
             .into_iter()
             .map(|peer| NodeMetricsPushRequestPeer {
-                hostname: state.get_hostname_by_public_key(&peer.public_key),
+                hostname: self.state.get_hostname_by_public_key(&peer.public_key),
                 endpoint: peer.endpoint,
                 latest_handshake: peer.latest_handshake,
                 transfer_rx: peer.transfer_rx,
@@ -102,7 +96,7 @@ impl NodeContext {
             .collect();
 
         let request = NodeMetricsPushRequest {
-            hostname: state.hostname.clone(),
+            hostname: self.state.hostname.clone(),
             interface: info.interface,
             listening_port: info.listening_port,
             peers,
@@ -111,19 +105,14 @@ impl NodeContext {
         Ok(request)
     }
 
-    pub fn push_metrics(&self) -> Result<()> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor::default());
-        // get agent
-        let agent = self
-            .agent
-            .lock()
-            .map_err(|_| NodeError::StateLockPoisoned)?;
+    pub async fn push_metrics(&self) -> Result<()> {
+        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
         // collect local wireguard metrics:
-        let info = wireguard_command.collect()?;
+        let info = wireguard_command.collect().await?;
         if let Some(metrics) = info {
             let request = self.metrics_push_request_from_info(metrics)?;
             // push metrics to lighthouse:
-            agent.push_metrics(request)?;
+            self.agent.push_metrics(request).await?;
         }
         Ok(())
     }

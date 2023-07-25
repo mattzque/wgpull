@@ -10,11 +10,11 @@ const DISCOVER_SERVICES: [&str; 3] = [
 /// Discovers the public ip of the node using public services on the internet.
 /// This is used if the endpoint is set to "discover".
 /// Of course this assumes that the node has access to the internet for this to work.
-pub fn discover_public_ip() -> Result<String> {
+pub async fn discover_public_ip() -> Result<String> {
     for service in DISCOVER_SERVICES.iter() {
-        let response = ureq::get(service).call()?;
+        let response = reqwest::get(service.to_string()).await?;
         if response.status() == 200 {
-            let content = response.into_string()?.trim().to_string();
+            let content = response.text().await?.trim().to_string();
             content.parse::<Ipv4Addr>()?;
             return Ok(content);
         }

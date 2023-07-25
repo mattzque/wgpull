@@ -5,6 +5,8 @@ all: package
 package-ipk:
 	rm -f package/*.ipk
 	rustup target add armv7-unknown-linux-musleabihf
+	CC=/opt/musl/bin/arm-linux-musleabihf-gcc \
+	AR=/opt/musl/bin/arm-linux-musleabihf-ar \
 	CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER=rust-lld \
 		cargo build \
 		--target armv7-unknown-linux-musleabihf \

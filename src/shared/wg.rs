@@ -37,10 +37,11 @@ impl<T: CommandExecutor> WireguardCommand<T> {
         Self { executor }
     }
 
-    pub fn collect(&self) -> Result<Option<WireguardInfo>> {
+    pub async fn collect(&self) -> Result<Option<WireguardInfo>> {
         let (stdout, _) = self
             .executor
-            .execute_with_args("wg", &["show", "all", "dump"])?;
+            .execute_with_args("wg", &["show", "all", "dump"])
+            .await?;
 
         if stdout.lines().count() == 0 {
             return Ok(None);
@@ -75,30 +76,71 @@ impl<T: CommandExecutor> WireguardCommand<T> {
         }))
     }
 
-    pub fn generate_key(&self) -> Result<String> {
-        let (stdout, _) = self.executor.execute_with_args("wg", &["genkey"])?;
+    pub async fn generate_key(&self) -> Result<String> {
+        let (stdout, _) = self.executor.execute_with_args("wg", &["genkey"]).await?;
         Ok(stdout.trim().to_string())
     }
 
-    pub fn generate_psk(&self) -> Result<String> {
-        let (stdout, _) = self.executor.execute_with_args("wg", &["genpsk"])?;
+    pub async fn generate_psk(&self) -> Result<String> {
+        let (stdout, _) = self.executor.execute_with_args("wg", &["genpsk"]).await?;
         Ok(stdout.trim().to_string())
     }
 
-    pub fn generate_pubkey(&self, private_key: String) -> Result<String> {
-        let (stdout, _) =
-            self.executor
-                .execute_with_args_and_io("wg", &["pubkey"], &private_key)?;
+    pub async fn generate_pubkey(&self, private_key: String) -> Result<String> {
+        let (stdout, _) = self
+            .executor
+            .execute_with_args_and_io("wg", &["pubkey"], &private_key)
+            .await?;
         Ok(stdout.trim().to_string())
     }
 
-    pub fn generate_keypair(&self) -> Result<KeyPair> {
-        let private_key = self.generate_key()?;
-        let public_key = self.generate_pubkey(private_key.clone())?;
+    pub async fn generate_keypair(&self) -> Result<KeyPair> {
+        let private_key = self.generate_key().await?;
+        let public_key = self.generate_pubkey(private_key.clone()).await?;
 
         Ok(KeyPair {
             private_key,
             public_key,
         })
     }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::validation::validate_wg_key;
+
+    #[tokio::test]
+    async fn test_generate_key() {
+        use super::*;
+        use crate::command::SystemCommandExecutor;
+
+        let command = WireguardCommand::new(SystemCommandExecutor);
+        let key = command.generate_key().await.unwrap();
+        assert_eq!(key.len(), 44);
+        validate_wg_key("", &key).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_generate_psk() {
+        use super::*;
+        use crate::command::SystemCommandExecutor;
+
+        let command = WireguardCommand::new(SystemCommandExecutor);
+        let key = command.generate_psk().await.unwrap();
+        assert_eq!(key.len(), 44);
+        validate_wg_key("", &key).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_generate_pubkey() {
+        use super::*;
+        use crate::command::SystemCommandExecutor;
+
+        let command = WireguardCommand::new(SystemCommandExecutor);
+        let key = command.generate_key().await.unwrap();
+        let pubkey = command.generate_pubkey(key).await.unwrap();
+        assert_eq!(pubkey.len(), 44);
+        validate_wg_key("", &pubkey).unwrap();
+    }
+
 }
