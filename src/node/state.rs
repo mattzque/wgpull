@@ -1,10 +1,15 @@
+use std::sync::Arc;
+
 use super::{backend::get_backend_impl, config::NodeConfigFile, discover::discover_public_ip};
 use anyhow::Result;
 use log::info;
 use serde::{Deserialize, Serialize};
 use shared_lib::{
-    command::SystemCommandExecutor, file::FileAccessor, request::NodePullRequest,
-    response::NodePullResponse, wg::WireguardCommand,
+    command::{CommandExecutor, SystemCommandExecutor},
+    file::FileAccessor,
+    request::NodePullRequest,
+    response::NodePullResponse,
+    wg::WireguardCommand,
 };
 
 use thiserror::Error;
@@ -100,7 +105,11 @@ impl NodeState {
             .unwrap_or("<unknown>".to_string())
     }
 
-    pub async fn from_wireguard_config(config: &NodeConfigFile) -> Result<Self> {
+    pub async fn from_wireguard_config(
+        config: &NodeConfigFile,
+        executor: Arc<dyn CommandExecutor>,
+        file_accessor: Arc<dyn FileAccessor>,
+    ) -> Result<Self> {
         let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
 
         let keypair = wireguard_command.generate_keypair().await?;
@@ -114,7 +123,12 @@ impl NodeState {
 
         let hostname = {
             // get backend by configuration
-            let backend = get_backend_impl(config.wireguard.backend.clone(), config);
+            let backend = get_backend_impl(
+                config.wireguard.backend.clone(),
+                config,
+                executor,
+                file_accessor,
+            );
             if !backend.is_compatible().await {
                 return Err(NodeError::BackendNotCompatible.into());
             }

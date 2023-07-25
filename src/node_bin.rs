@@ -1,9 +1,12 @@
 mod node;
 use log::{error, info};
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use crate::node::{config::NodeConfigFile, context::NodeContext};
-use shared_lib::{config, file::SystemFileAccessor, logger};
+use shared_lib::{command::SystemCommandExecutor, config, file::SystemFileAccessor, logger};
 
 #[tokio::main]
 async fn main() {
@@ -14,10 +17,13 @@ async fn main() {
     info!("Using configuration from: {}", config_path);
 
     let config = config::load_config::<NodeConfigFile>(config_path).expect("Failed to load config");
-    let accessor = SystemFileAccessor;
-    let mut context = NodeContext::init(&config, Box::new(accessor))
-        .await
-        .expect("Failed to initialize context");
+    let mut context = NodeContext::init(
+        &config,
+        Arc::new(SystemCommandExecutor),
+        Arc::new(SystemFileAccessor),
+    )
+    .await
+    .expect("Failed to initialize context");
 
     if let Err(err) = context.push_metrics().await {
         error!("Failed to push metrics: {}", err);

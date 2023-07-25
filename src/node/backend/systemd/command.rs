@@ -1,12 +1,12 @@
 use anyhow::Result;
 use shared_lib::command::CommandExecutor;
 
-pub struct SystemdCommand<T: CommandExecutor> {
-    executor: T,
+pub struct SystemdCommand<'a, T: CommandExecutor + ?Sized> {
+    executor: &'a T,
 }
 
-impl<T: CommandExecutor> SystemdCommand<T> {
-    pub fn new(executor: T) -> SystemdCommand<T> {
+impl<'a, T: CommandExecutor + ?Sized> SystemdCommand<'a, T> {
+    pub fn new(executor: &'a T) -> SystemdCommand<T> {
         Self { executor }
     }
 

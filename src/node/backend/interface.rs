@@ -1,14 +1,12 @@
+use std::sync::Arc;
+
 use crate::node::config::NodeConfigFile;
 use anyhow::Result;
 use axum::async_trait;
 use serde::{Deserialize, Serialize};
-use shared_lib::{command::SystemCommandExecutor, file::SystemFileAccessor};
+use shared_lib::{command::CommandExecutor, file::FileAccessor};
 
-use super::{
-    super::state::NodeState,
-    systemd::{SystemdBackend, SystemdCommand},
-    uci::{UciBackend, UciCommand},
-};
+use super::{super::state::NodeState, systemd::SystemdBackend, uci::UciBackend};
 
 #[derive(Clone, Eq, PartialEq, Deserialize, Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -30,15 +28,18 @@ pub trait Backend {
     async fn get_hostname(&self) -> Result<String>;
 }
 
-pub fn get_backend_impl(backend: BackendType, config: &NodeConfigFile) -> Box<dyn Backend> {
-    let executor = SystemCommandExecutor;
+pub fn get_backend_impl(
+    backend: BackendType,
+    config: &NodeConfigFile,
+    executor: Arc<dyn CommandExecutor>,
+    file_accessor: Arc<dyn FileAccessor>,
+) -> Box<dyn Backend> {
     match backend {
         BackendType::Systemd => Box::new(SystemdBackend::new(
             &config.systemd,
-            SystemdCommand::new(executor),
-            Box::new(SystemCommandExecutor),
-            Box::new(SystemFileAccessor),
+            executor,
+            file_accessor,
         )),
-        BackendType::Uci => Box::new(UciBackend::new(&config.uci, UciCommand::new(executor))),
+        BackendType::Uci => Box::new(UciBackend::new(&config.uci, executor)),
     }
 }

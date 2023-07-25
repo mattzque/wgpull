@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::{
     super::interface::Backend,
     command::{UciCommand, UciWireguardConfig, UciWireguardPeer},
@@ -9,24 +11,25 @@ use axum::async_trait;
 use log::info;
 use shared_lib::command::CommandExecutor;
 
-pub struct UciBackend<T: CommandExecutor> {
+pub struct UciBackend {
     pub config: UciConfig,
-    pub command: UciCommand<T>,
+    pub executor: Arc<dyn CommandExecutor>,
 }
 
-impl<T: CommandExecutor> UciBackend<T> {
-    pub fn new(config: &UciConfig, command: UciCommand<T>) -> Self {
+impl UciBackend {
+    pub fn new(config: &UciConfig, executor: Arc<dyn CommandExecutor>) -> Self {
         Self {
             config: config.clone(),
-            command,
+            executor,
         }
     }
 }
 
 #[async_trait]
-impl<T: CommandExecutor> Backend for UciBackend<T> {
+impl Backend for UciBackend {
     async fn is_compatible(&self) -> bool {
-        self.command.test_uci().await
+        let command = UciCommand::new(self.executor.as_ref());
+        command.test_uci().await
     }
 
     async fn update_local_state(&self, state: &NodeState) -> Result<bool> {
@@ -51,10 +54,10 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
             peers: uci_peers,
         };
 
-        let changed = if let Ok(current_uci_config) = self
-            .command
-            .get_wireguard_config(&self.config.interface)
-            .await
+        let command = UciCommand::new(self.executor.as_ref());
+
+        let changed = if let Ok(current_uci_config) =
+            command.get_wireguard_config(&self.config.interface).await
         {
             info!(
                 "current_uci_config.peers: {}",
@@ -71,10 +74,10 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
                 "[uci] update local wireguard configuration, using {} peers",
                 uci_config.peers.len()
             );
-            self.command
+            command
                 .update_wireguard_config(&self.config.interface, &uci_config)
                 .await?;
-            self.command.commit(&self.config.interface).await?;
+            command.commit(&self.config.interface).await?;
             Ok(true)
         } else {
             info!(
@@ -86,7 +89,8 @@ impl<T: CommandExecutor> Backend for UciBackend<T> {
     }
 
     async fn get_hostname(&self) -> Result<String> {
-        let hostname = self.command.get_hostname().await?;
+        let command = UciCommand::new(self.executor.as_ref());
+        let hostname = command.get_hostname().await?;
         Ok(hostname)
     }
 }

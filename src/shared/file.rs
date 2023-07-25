@@ -10,7 +10,6 @@ pub trait FileAccessor: Send + Sync {
     async fn set_permissions(&self, path: &str, permissions: Permissions) -> Result<()>;
 }
 
-#[derive(Clone)]
 pub struct SystemFileAccessor;
 
 #[async_trait]

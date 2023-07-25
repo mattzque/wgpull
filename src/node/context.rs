@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use super::{agent::NodeAgent, config::NodeConfigFile, state::NodeState};
 use crate::node::{backend::get_backend_impl, state::NodeError};
 use anyhow::Result;
 use log::info;
 use shared_lib::{
-    command::SystemCommandExecutor,
+    command::{CommandExecutor, SystemCommandExecutor},
     file::FileAccessor,
     request::{NodeMetricsPushRequest, NodeMetricsPushRequestPeer, NodePullRequest},
     validation::Validated,
@@ -14,13 +16,15 @@ pub struct NodeContext {
     pub config: NodeConfigFile,
     pub state: NodeState,
     pub agent: NodeAgent,
-    pub file_accessor: Box<dyn FileAccessor>,
+    pub executor: Arc<dyn CommandExecutor>,
+    pub file_accessor: Arc<dyn FileAccessor>,
 }
 
 impl NodeContext {
     pub async fn init(
         config: &NodeConfigFile,
-        file_accessor: Box<dyn FileAccessor>,
+        executor: Arc<dyn CommandExecutor>,
+        file_accessor: Arc<dyn FileAccessor>,
     ) -> Result<Self> {
         match NodeState::from_file(&config.node.state_file, file_accessor.as_ref()).await? {
             Some(state) => {
@@ -28,17 +32,24 @@ impl NodeContext {
                     config: config.clone(),
                     state,
                     agent: NodeAgent::from_node_config(&config.node)?,
+                    executor,
                     file_accessor,
                 };
                 Ok(context)
             }
             None => {
                 info!("Local node has no state, generating new wireguard keys.");
-                let state = NodeState::from_wireguard_config(config).await?;
+                let state = NodeState::from_wireguard_config(
+                    config,
+                    executor.clone(),
+                    file_accessor.clone(),
+                )
+                .await?;
                 let context = NodeContext {
                     config: config.clone(),
                     state,
                     agent: NodeAgent::from_node_config(&config.node)?,
+                    executor,
                     file_accessor,
                 };
                 Ok(context)
@@ -62,7 +73,12 @@ impl NodeContext {
         self.state.update_from_pull_response(&response).await?;
 
         // get backend by configuration
-        let backend = get_backend_impl(self.config.wireguard.backend.clone(), &self.config);
+        let backend = get_backend_impl(
+            self.config.wireguard.backend.clone(),
+            &self.config,
+            self.executor.clone(),
+            self.file_accessor.clone(),
+        );
         if !backend.is_compatible().await {
             return Err(NodeError::BackendNotCompatible.into());
         }

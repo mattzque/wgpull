@@ -36,12 +36,12 @@ pub struct UciWireguardConfig {
     pub peers: Vec<UciWireguardPeer>,
 }
 
-pub struct UciCommand<T: CommandExecutor> {
-    executor: T,
+pub struct UciCommand<'a, T: CommandExecutor + ?Sized> {
+    executor: &'a T,
 }
 
-impl<T: CommandExecutor> UciCommand<T> {
-    pub fn new(executor: T) -> UciCommand<T> {
+impl<'a, T: CommandExecutor + ?Sized> UciCommand<'a, T> {
+    pub fn new(executor: &'a T) -> UciCommand<'a, T> {
         Self { executor }
     }
 

@@ -142,5 +142,4 @@ mod test {
         assert_eq!(pubkey.len(), 44);
         validate_wg_key("", &pubkey).unwrap();
     }
-
 }
