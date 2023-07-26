@@ -14,9 +14,9 @@ pub trait CurrentTime {
 }
 
 #[derive(Default)]
-pub struct CurrentSystemTime;
+pub struct SystemCurrentTime;
 
-impl CurrentTime for CurrentSystemTime {
+impl CurrentTime for SystemCurrentTime {
     fn now(&self) -> SystemTime {
         SystemTime::now()
     }

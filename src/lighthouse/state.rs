@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::{
     collections::{hash_map::Entry, HashMap},
+    sync::Arc,
     time::SystemTime,
 };
 
@@ -76,6 +77,8 @@ pub struct LighthouseState {
 }
 
 impl LighthouseState {
+    /// Load state from a file in TOML format, if the state file is not present return None without error.
+    /// Otherwise return the state or an error in case the state is corrupted or filesystem issues.
     pub async fn from_file(
         path: &str,
         accessor: &dyn FileAccessor,
@@ -94,6 +97,7 @@ impl LighthouseState {
         Ok(Some(state))
     }
 
+    /// Saves the state to disk in TOML format.
     pub async fn save(&self, path: &str, accessor: &dyn FileAccessor) -> Result<()> {
         info!("Saving lighthouse state to {}", path);
         // Convert the state to a TOML string.
@@ -104,6 +108,8 @@ impl LighthouseState {
     }
 
     /// Update or insert a node lease from a pull request.
+    /// It keeps the last rotation time of the node lease, but updates the last_modified time
+    /// if the node lease has changed.
     pub fn upsert_node_lease_from_pull_request(
         &mut self,
         request: &NodePullRequest,
@@ -156,15 +162,14 @@ impl LighthouseState {
         }
     }
 
-    pub async fn get_peers_response_for_node<T>(
+    /// Get connected peer configuration for a node. This generates pre-shared keys on the fly.
+    /// The order of the peers returned is sorted by their hostname.
+    pub async fn get_peers_response_for_node(
         &mut self,
         hostname: &str,
-        executor: T,
-    ) -> Vec<NodePullResponsePeer>
-    where
-        T: CommandExecutor + Send + Sync,
-    {
-        let wireguard_command = WireguardCommand::new(executor);
+        executor: Arc<dyn CommandExecutor>,
+    ) -> Vec<NodePullResponsePeer> {
+        let wireguard_command = WireguardCommand::new(executor.as_ref());
 
         let mut peers: Vec<NodePullResponsePeer> = Vec::new();
 
@@ -210,6 +215,9 @@ impl LighthouseState {
         peers
     }
 
+    /// Determines if the node should regenerate keys based on the regeneration interval and time of day.
+    /// This allows to regenerate keys during the night, because there might be a short downtime of the
+    /// network during the regeneration of all the keys.
     pub fn should_regenerate_keys(
         &mut self,
         hostname: &str,

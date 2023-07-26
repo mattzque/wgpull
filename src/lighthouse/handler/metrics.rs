@@ -32,9 +32,6 @@ pub async fn get_metrics_handler(
 ) -> Result<Response, LighthouseResponseError> {
     let context = context.context.lock().await;
 
-    if let Ok(prometheus_metrics) = context.get_metrics_prometheus_export() {
-        Ok((StatusCode::OK, prometheus_metrics).into_response())
-    } else {
-        Err(LighthouseResponseError::InternalError)
-    }
+    let prometheus_metrics = context.get_metrics_prometheus_export();
+    Ok((StatusCode::OK, prometheus_metrics).into_response())
 }

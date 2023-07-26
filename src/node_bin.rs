@@ -6,7 +6,10 @@ use std::{
 };
 
 use crate::node::{config::NodeConfigFile, context::NodeContext};
-use shared_lib::{command::SystemCommandExecutor, config, file::SystemFileAccessor, logger};
+use shared_lib::{
+    client::SystemHttpClient, command::SystemCommandExecutor, config, file::SystemFileAccessor,
+    logger,
+};
 
 #[tokio::main]
 async fn main() {
@@ -21,6 +24,7 @@ async fn main() {
         &config,
         Arc::new(SystemCommandExecutor),
         Arc::new(SystemFileAccessor),
+        Arc::new(SystemHttpClient::new(10).expect("Failed to create http client")),
     )
     .await
     .expect("Failed to initialize context");

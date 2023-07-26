@@ -1,4 +1,4 @@
-use axum::async_trait;
+use async_trait::async_trait;
 use log::debug;
 use std::process::Stdio;
 use tokio::io::{AsyncWriteExt, Error, ErrorKind, Result};

@@ -5,11 +5,8 @@ use anyhow::Result;
 use log::info;
 use serde::{Deserialize, Serialize};
 use shared_lib::{
-    command::{CommandExecutor, SystemCommandExecutor},
-    file::FileAccessor,
-    request::NodePullRequest,
-    response::NodePullResponse,
-    wg::WireguardCommand,
+    client::HttpClient, command::CommandExecutor, file::FileAccessor, request::NodePullRequest,
+    response::NodePullResponse, wg::WireguardCommand,
 };
 
 use thiserror::Error;
@@ -109,12 +106,13 @@ impl NodeState {
         config: &NodeConfigFile,
         executor: Arc<dyn CommandExecutor>,
         file_accessor: Arc<dyn FileAccessor>,
+        http_client: Arc<dyn HttpClient>,
     ) -> Result<Self> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
+        let wireguard_command = WireguardCommand::new(executor.as_ref());
 
         let keypair = wireguard_command.generate_keypair().await?;
         let endpoint = if config.wireguard.endpoint == "discover" {
-            let public_ip = discover_public_ip().await?;
+            let public_ip = discover_public_ip(http_client.as_ref()).await?;
             info!("Using public ip discovery for node endpoint: {}", public_ip);
             public_ip
         } else {
@@ -149,8 +147,12 @@ impl NodeState {
         })
     }
 
-    pub async fn update_from_pull_response(&mut self, response: &NodePullResponse) -> Result<()> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
+    pub async fn update_from_pull_response(
+        &mut self,
+        response: &NodePullResponse,
+        executor: Arc<dyn CommandExecutor>,
+    ) -> Result<()> {
+        let wireguard_command = WireguardCommand::new(executor.as_ref());
 
         if response.regenerate_keys {
             info!("Regenerating keys as requested by lighthouse.");

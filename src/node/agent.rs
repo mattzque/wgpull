@@ -1,10 +1,9 @@
 use anyhow::Result;
-use axum::http::{HeaderMap, HeaderValue};
 use log::error;
-use reqwest::Client;
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde::Serialize;
+use shared_lib::client::HttpClient;
 use shared_lib::validation::Validated;
-use std::time::Duration;
 use thiserror::Error;
 
 use shared_lib::challenge::ChallengeResponse;
@@ -28,19 +27,15 @@ pub enum AgentError {
     RequestValidationError,
 }
 
-pub struct NodeAgent {
+pub struct NodeAgent<'a, T: HttpClient + ?Sized> {
     lighthouse_url: String,
     lighthouse_key: String,
     node_key: String,
-    client: Client,
+    client: &'a T,
 }
 
-impl NodeAgent {
-    pub fn from_node_config(config: &NodeConfig) -> Result<Self> {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()?;
-
+impl<'a, T: HttpClient + ?Sized> NodeAgent<'a, T> {
+    pub fn from_node_config(config: &NodeConfig, client: &'a T) -> Result<Self> {
         Ok(Self {
             lighthouse_url: format!(
                 "{}://{}:{}/{}",
@@ -55,10 +50,10 @@ impl NodeAgent {
         })
     }
 
-    pub async fn post<T: Serialize + Validated>(
+    pub async fn post<Body: Serialize + Validated>(
         &self,
         path: &'static str,
-        request: &T,
+        request: &Body,
     ) -> Result<String, AgentError> {
         request.validate().map_err(|err| {
             error!("Error validating the request to send: {}", err.to_string());
@@ -80,13 +75,8 @@ impl NodeAgent {
         );
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
 
-        let resp = self
-            .client
-            .post(format!("{}{}", self.lighthouse_url, path))
-            .headers(headers)
-            .body(body)
-            .send()
-            .await;
+        let url = format!("{}{}", self.lighthouse_url, path);
+        let resp = self.client.post(&url, headers, body).await;
 
         match resp {
             Ok(resp) => {

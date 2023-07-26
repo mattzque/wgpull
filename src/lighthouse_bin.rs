@@ -1,5 +1,5 @@
 mod lighthouse;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     middleware,
@@ -12,21 +12,24 @@ use lighthouse::{
     config::LighthouseConfig, context::LighthouseContextProvider, handler::lighthouse_keys_layer,
 };
 use log::info;
-use shared_lib::file::SystemFileAccessor;
-use shared_lib::time::CurrentSystemTime;
+use shared_lib::{
+    command::CommandExecutor,
+    file::FileAccessor,
+    time::{CurrentTime, SystemCurrentTime},
+};
+use shared_lib::{command::SystemCommandExecutor, file::SystemFileAccessor};
 
 use crate::lighthouse::config::LighthouseConfigFile;
 use shared_lib::{config, logger};
 
-async fn make_router(config: LighthouseConfig) -> anyhow::Result<Router> {
-    // system time provider, uses SystemTime for telling the time
-    let time = CurrentSystemTime;
-
-    let file_accessor = SystemFileAccessor;
-
+async fn make_router(
+    config: LighthouseConfig,
+    time: Arc<dyn CurrentTime + Send + Sync>,
+    file_accessor: Arc<dyn FileAccessor + Send + Sync>,
+    executor: Arc<dyn CommandExecutor + Send + Sync>,
+) -> anyhow::Result<Router> {
     // create the lighthouse context to share across handlers
-    let lighthouse =
-        LighthouseContext::init(config, Box::new(time), Box::new(file_accessor)).await?;
+    let lighthouse = LighthouseContext::init(config, time, file_accessor, executor).await?;
 
     // let state = Arc::new(lighthouse);
     let state = LighthouseContextProvider::new(lighthouse);
@@ -66,9 +69,14 @@ async fn main() {
         .parse::<SocketAddr>()
         .expect("Invalid bindhost/port for lighthouse!");
 
-    let app = make_router(config.lighthouse)
-        .await
-        .expect("Unable to create router!");
+    let app = make_router(
+        config.lighthouse,
+        Arc::new(SystemCurrentTime),
+        Arc::new(SystemFileAccessor),
+        Arc::new(SystemCommandExecutor),
+    )
+    .await
+    .expect("Unable to create router!");
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())

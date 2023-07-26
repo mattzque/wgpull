@@ -39,6 +39,7 @@ pub struct LighthouseMetrics {
 }
 
 impl LighthouseMetrics {
+    /// Upserts the metrics of a single node, aggregating the metrics of all nodes by hostname.
     pub fn upsert_metrics(&mut self, request: &NodeMetricsPushRequest) {
         let peers = request
             .peers

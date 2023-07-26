@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::node::config::NodeConfigFile;
 use anyhow::Result;
-use axum::async_trait;
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use shared_lib::{command::CommandExecutor, file::FileAccessor};
 

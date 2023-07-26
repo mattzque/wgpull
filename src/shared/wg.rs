@@ -28,12 +28,12 @@ pub struct KeyPair {
     pub private_key: String,
 }
 
-pub struct WireguardCommand<T: CommandExecutor> {
-    executor: T,
+pub struct WireguardCommand<'a, T: CommandExecutor + ?Sized> {
+    executor: &'a T,
 }
 
-impl<T: CommandExecutor> WireguardCommand<T> {
-    pub fn new(executor: T) -> WireguardCommand<T> {
+impl<'a, T: CommandExecutor + ?Sized> WireguardCommand<'a, T> {
+    pub fn new(executor: &'a T) -> WireguardCommand<'a, T> {
         Self { executor }
     }
 
@@ -113,8 +113,9 @@ mod test {
     async fn test_generate_key() {
         use super::*;
         use crate::command::SystemCommandExecutor;
+        let executor = SystemCommandExecutor;
 
-        let command = WireguardCommand::new(SystemCommandExecutor);
+        let command = WireguardCommand::new(&executor);
         let key = command.generate_key().await.unwrap();
         assert_eq!(key.len(), 44);
         validate_wg_key("", &key).unwrap();
@@ -124,8 +125,9 @@ mod test {
     async fn test_generate_psk() {
         use super::*;
         use crate::command::SystemCommandExecutor;
+        let executor = SystemCommandExecutor;
 
-        let command = WireguardCommand::new(SystemCommandExecutor);
+        let command = WireguardCommand::new(&executor);
         let key = command.generate_psk().await.unwrap();
         assert_eq!(key.len(), 44);
         validate_wg_key("", &key).unwrap();
@@ -135,8 +137,9 @@ mod test {
     async fn test_generate_pubkey() {
         use super::*;
         use crate::command::SystemCommandExecutor;
+        let executor = SystemCommandExecutor;
 
-        let command = WireguardCommand::new(SystemCommandExecutor);
+        let command = WireguardCommand::new(&executor);
         let key = command.generate_key().await.unwrap();
         let pubkey = command.generate_pubkey(key).await.unwrap();
         assert_eq!(pubkey.len(), 44);

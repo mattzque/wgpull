@@ -5,7 +5,8 @@ use crate::node::{backend::get_backend_impl, state::NodeError};
 use anyhow::Result;
 use log::info;
 use shared_lib::{
-    command::{CommandExecutor, SystemCommandExecutor},
+    client::HttpClient,
+    command::CommandExecutor,
     file::FileAccessor,
     request::{NodeMetricsPushRequest, NodeMetricsPushRequestPeer, NodePullRequest},
     validation::Validated,
@@ -15,9 +16,9 @@ use shared_lib::{
 pub struct NodeContext {
     pub config: NodeConfigFile,
     pub state: NodeState,
-    pub agent: NodeAgent,
     pub executor: Arc<dyn CommandExecutor>,
     pub file_accessor: Arc<dyn FileAccessor>,
+    pub http_client: Arc<dyn HttpClient>,
 }
 
 impl NodeContext {
@@ -25,15 +26,16 @@ impl NodeContext {
         config: &NodeConfigFile,
         executor: Arc<dyn CommandExecutor>,
         file_accessor: Arc<dyn FileAccessor>,
+        http_client: Arc<dyn HttpClient>,
     ) -> Result<Self> {
         match NodeState::from_file(&config.node.state_file, file_accessor.as_ref()).await? {
             Some(state) => {
                 let context = NodeContext {
                     config: config.clone(),
                     state,
-                    agent: NodeAgent::from_node_config(&config.node)?,
                     executor,
                     file_accessor,
+                    http_client,
                 };
                 Ok(context)
             }
@@ -43,14 +45,15 @@ impl NodeContext {
                     config,
                     executor.clone(),
                     file_accessor.clone(),
+                    http_client.clone(),
                 )
                 .await?;
                 let context = NodeContext {
                     config: config.clone(),
                     state,
-                    agent: NodeAgent::from_node_config(&config.node)?,
                     executor,
                     file_accessor,
+                    http_client,
                 };
                 Ok(context)
             }
@@ -59,10 +62,10 @@ impl NodeContext {
 
     pub async fn pull_wireguard(&mut self) -> Result<()> {
         info!("Pulling Wireguard configuration.");
-        // Lock the state to ensure exclusive access.
+        let agent = NodeAgent::from_node_config(&self.config.node, self.http_client.as_ref())?;
 
         let request: NodePullRequest = self.state.clone().into();
-        let response = self.agent.pull_wireguard(request).await?;
+        let response = agent.pull_wireguard(request).await?;
 
         info!(
             "Received configuration of {} peers from lighthouse.",
@@ -70,7 +73,9 @@ impl NodeContext {
         );
 
         // update state from response, replacing all peers and regenerate keys if requested
-        self.state.update_from_pull_response(&response).await?;
+        self.state
+            .update_from_pull_response(&response, self.executor.clone())
+            .await?;
 
         // get backend by configuration
         let backend = get_backend_impl(
@@ -122,13 +127,14 @@ impl NodeContext {
     }
 
     pub async fn push_metrics(&self) -> Result<()> {
-        let wireguard_command = WireguardCommand::new(SystemCommandExecutor);
+        let agent = NodeAgent::from_node_config(&self.config.node, self.http_client.as_ref())?;
+        let wireguard_command = WireguardCommand::new(self.executor.as_ref());
         // collect local wireguard metrics:
         let info = wireguard_command.collect().await?;
         if let Some(metrics) = info {
             let request = self.metrics_push_request_from_info(metrics)?;
             // push metrics to lighthouse:
-            self.agent.push_metrics(request).await?;
+            agent.push_metrics(request).await?;
         }
         Ok(())
     }
