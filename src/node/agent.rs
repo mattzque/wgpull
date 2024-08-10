@@ -113,7 +113,7 @@ impl<'a, T: HttpClient + ?Sized> NodeAgent<'a, T> {
     }
 
     pub async fn push_metrics(&self, request: NodeMetricsPushRequest) -> Result<()> {
-        self.post("api/v1/push", &request).await?;
+        self.post("api/v1/metrics", &request).await?;
 
         Ok(())
     }

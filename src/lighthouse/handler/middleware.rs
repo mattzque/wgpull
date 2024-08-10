@@ -1,6 +1,5 @@
 use axum::{
-    extract::State,
-    http::Request,
+    extract::{Request, State},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -17,10 +16,10 @@ use super::LighthouseResponseError;
 /// Using the node challenge it generates a challenge response and injects it in the final response header.
 ///
 /// This allows the lighthouse to authenticate the clients and vice-versa the nodes the lighthouse.
-pub async fn lighthouse_keys_layer<B>(
+pub async fn lighthouse_keys_layer(
     State(context): State<LighthouseContextProvider>,
-    request: Request<B>,
-    next: Next<B>,
+    request: Request,
+    next: Next,
 ) -> Response {
     let received_lighthouse_key = request
         .headers()

@@ -86,7 +86,10 @@ impl LighthouseState {
         info!("Restoring lighthouse state from {}", path);
         let contents = match accessor.read(path).await {
             Ok(contents) => contents,
-            Err(_) => return Ok(None),
+            Err(_) => {
+                info!("No lighthouse state file found, starting with empty state.");
+                return Ok(None);
+            }
         };
 
         let state = match toml::from_str(&contents) {

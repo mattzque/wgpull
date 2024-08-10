@@ -39,6 +39,7 @@ impl Backend for UciBackend {
             .map(|peer| UciWireguardPeer {
                 description: peer.hostname.clone(),
                 public_key: peer.public_key.clone(),
+                preshared_key: peer.preshared_key.clone(),
                 endpoint_host: peer.endpoint_host.clone(),
                 endpoint_port: peer.endpoint_port,
                 persistent_keepalive: peer.persistent_keepalive,

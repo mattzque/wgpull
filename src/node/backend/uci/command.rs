@@ -21,6 +21,7 @@ impl From<std::io::Error> for UciError {
 pub struct UciWireguardPeer {
     pub description: String,
     pub public_key: String,
+    pub preshared_key: String,
     pub endpoint_host: String,
     pub endpoint_port: u32,
     pub persistent_keepalive: u32,
@@ -146,6 +147,9 @@ impl<'a, T: CommandExecutor + ?Sized> UciCommand<'a, T> {
             public_key: self
                 .get_value(&format!("network.{}.public_key", key))
                 .await?,
+            preshared_key: self
+                .get_value(&format!("network.{}.preshared_key", key))
+                .await?,
             endpoint_host: self
                 .get_value(&format!("network.{}.endpoint_host", key))
                 .await?,
@@ -239,6 +243,11 @@ impl<'a, T: CommandExecutor + ?Sized> UciCommand<'a, T> {
             self.set_value(
                 format!("network.{}.public_key", section_key).as_str(),
                 &peer.public_key,
+            )
+            .await?;
+            self.set_value(
+                format!("network.{}.preshared_key", section_key).as_str(),
+                &peer.preshared_key,
             )
             .await?;
             self.set_value(

@@ -99,7 +99,7 @@ impl NodeState {
             .iter()
             .find(|p| p.public_key == public_key)
             .map(|p| p.hostname.clone())
-            .unwrap_or("<unknown>".to_string())
+            .unwrap_or("unknown".to_string())
     }
 
     pub async fn from_wireguard_config(

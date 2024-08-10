@@ -3,6 +3,7 @@ use std::str;
 
 use crate::command::CommandExecutor;
 
+#[derive(Debug)]
 pub struct PeerInfo {
     pub interface: String,
     pub public_key: String,
@@ -15,6 +16,7 @@ pub struct PeerInfo {
     pub persistent_keepalive: i64,
 }
 
+#[derive(Debug)]
 pub struct WireguardInfo {
     pub interface: String,
     pub public_key: String,

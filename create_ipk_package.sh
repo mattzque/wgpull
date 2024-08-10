@@ -40,9 +40,9 @@ echo $(pwd)
 tar --owner=root --group=root -czf data.tar.gz -C data/ .
 tar --owner=root --group=root -czf control.tar.gz -C control/ .
 echo 2.0 > debian-binary
-tar -czf $PACKAGE-$VERSION.ipk debian-binary control.tar.gz data.tar.gz
+tar -czf $PACKAGE-$VERSION.ipk debian-binary './control.tar.gz' './data.tar.gz'
 popd
 
 cp $DEST_DIR/$PACKAGE-$VERSION.ipk package/
 
-rm -Rf ipk-build 
+rm -Rf ipk-build

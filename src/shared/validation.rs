@@ -1,5 +1,6 @@
 use anyhow::Result;
 use ipnet::IpNet;
+use log::error;
 use std::net::IpAddr;
 use std::str::FromStr;
 use thiserror::Error;
@@ -18,6 +19,9 @@ pub trait Validated {
 }
 
 pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), ValidationError> {
+    let parts: Vec<&str> = hostname.rsplitn(2, ':').collect();
+    let hostname = parts.last().unwrap_or(&"");
+
     if hostname.len() > 253 {
         return Err(ValidationError::InvalidFormat(
             name,
@@ -28,6 +32,7 @@ pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), Valid
     for label in hostname.split('.') {
         let len = label.len();
         if len == 0 || len > 63 {
+            error!("A label is empty or longer than 63 characters: {}", label);
             return Err(ValidationError::InvalidFormat(
                 name,
                 "A label is empty or longer than 63 characters",
@@ -38,6 +43,10 @@ pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), Valid
             || label.starts_with('-')
             || label.ends_with('-')
         {
+            error!(
+                "Invalid character in label or label starts/ends with a hyphen: {}",
+                label
+            );
             return Err(ValidationError::InvalidFormat(
                 name,
                 "Invalid character in label or label starts/ends with a hyphen",
@@ -45,12 +54,37 @@ pub fn validate_hostname(name: &'static str, hostname: &str) -> Result<(), Valid
         }
     }
 
+    if parts.len() == 2 && validate_port(parts[0]).is_err() {
+        return Err(ValidationError::InvalidFormat(name, "Invalid port number"));
+    }
+
     Ok(())
 }
 
+fn validate_port(port_str: &str) -> Result<(), ValidationError> {
+    let port: u16 = port_str
+        .parse()
+        .map_err(|_| ValidationError::InvalidFormat("Port", "Invalid Port number"))?;
+    if port == 0 {
+        Err(ValidationError::InvalidFormat(
+            "Port",
+            "Invalid Port number",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn validate_ip(name: &'static str, ip: &str) -> Result<(), ValidationError> {
+    let parts: Vec<&str> = ip.rsplitn(2, ':').collect();
+    let ip = parts.last().unwrap_or(&"");
+
     if IpAddr::from_str(ip).is_err() {
         return Err(ValidationError::InvalidFormat(name, "Invalid IP address"));
+    }
+
+    if parts.len() == 2 && validate_port(parts[0]).is_err() {
+        return Err(ValidationError::InvalidFormat(name, "Invalid port number"));
     }
 
     Ok(())
@@ -94,7 +128,7 @@ pub fn validate_wg_key(name: &'static str, key: &str) -> Result<(), ValidationEr
         return Err(ValidationError::EmptyValue(name));
     }
 
-    match base64::decode(key) {
+    match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, key) {
         Ok(decoded) => {
             if decoded.len() == 32 {
                 Ok(())
