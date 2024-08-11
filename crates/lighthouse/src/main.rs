@@ -63,10 +63,11 @@ async fn main() {
     // setup logger (defaults the log level to info)
     logger::setup_logger();
 
-    let config_path = discover_config_path().expect("Failed to discover config path");
-    info!("Using configuration from: {}", config_path);
+    let config_path =
+        discover_config_path("lighthouse.toml").expect("Failed to discover config path");
+    info!("Using configuration from: {:?}", config_path);
 
-    let config = load_config::<LighthouseConfigFile>(config_path).expect("Failed to load config");
+    let config = load_config::<LighthouseConfigFile>(&config_path).expect("Failed to load config");
     let addr = config.lighthouse.get_listen_addr();
 
     info!("Lighthouse listening on: {}", addr);

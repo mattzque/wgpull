@@ -1,6 +1,7 @@
 use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -14,7 +15,7 @@ pub enum ConfigError {
 }
 
 /// Load the configuration from a file.
-pub fn load_config<T>(path: &str) -> Result<T, ConfigError>
+pub fn load_config<T>(path: &Path) -> Result<T, ConfigError>
 where
     T: DeserializeOwned,
 {
@@ -33,16 +34,18 @@ where
 ///
 /// Returns /etc/wgpull.conf if it exists, or ./wgpull.conf if it
 /// exists in the current working directory.
-pub fn discover_config_path() -> Result<&'static str, ConfigError> {
-    let paths = vec!["/etc/wgpull/wgpull.conf", "./wgpull.conf"];
+pub fn discover_config_path(filename: &'static str) -> Result<PathBuf, ConfigError> {
+    let paths = vec!["/etc/wgpull", "."];
 
     for path in paths {
-        if std::path::Path::new(path).exists() {
-            return Ok(path);
+        let candidate = PathBuf::from(path).join(filename);
+        if candidate.exists() {
+            return Ok(candidate);
         }
     }
 
-    Err(ConfigError::ConfigDiscovery(
-        "Could not find wgpull.conf".to_string(),
-    ))
+    Err(ConfigError::ConfigDiscovery(format!(
+        "Could not find {}",
+        filename
+    )))
 }

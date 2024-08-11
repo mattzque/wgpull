@@ -26,10 +26,10 @@ async fn main() {
     // setup logger (defaults the log level to info)
     logger::setup_logger();
 
-    let config_path = discover_config_path().expect("Failed to discover config path");
-    info!("Using configuration from: {}", config_path);
+    let config_path = discover_config_path("node.toml").expect("Failed to discover config path");
+    info!("Using configuration from: {:?}", config_path);
 
-    let config = load_config::<NodeConfigFile>(config_path).expect("Failed to load config");
+    let config = load_config::<NodeConfigFile>(&config_path).expect("Failed to load config");
     let mut context = NodeContext::init(
         &config,
         Arc::new(SystemCommandExecutor),
