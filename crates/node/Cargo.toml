@@ -1,0 +1,66 @@
+[package]
+name = "wgpull_node"
+version = "0.2.0"
+edition = "2021"
+description = "A Wireguard configuration management system"
+authors = ["Matthias Hecker"]
+keywords = ["wireguard", "linux", "openwrt"]
+repository = "https://github.com/mattzque/wgpull"
+license = "MIT"
+
+[[bin]]
+name = "wgpull-node"
+path = "./src/main.rs"
+
+[dependencies]
+wgpull_shared = { path = "../shared" }
+anyhow = "1.0"
+thiserror = "1.0"
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.9"
+log = "0.4"
+env_logger = "0.11"
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+ipnet = "2.9"
+chrono = "0.4"
+base64 = "0.22"
+async-trait = "0.1"
+tokio = { version = "1.39", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+] }
+
+[package.metadata.deb]
+maintainer = "Matthias Hecker <mail@mattzq.com>"
+copyright = "2024, Matthias Hecker <mail@mattzq.com>"
+license-file = ["../../LICENSE", "2"]
+extended-description = """\
+A Wireguard configuration system using a lighthouse and nodes. \
+For use with small wireguard mesh networks."""
+depends = "wireguard (>= 1.0.0)"
+section = "utility"
+priority = "optional"
+conf-files = ["/etc/wgpull/node.toml"]
+assets = [
+    [
+        "target/release/wgpull-node",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "../../README.md",
+        "usr/share/doc/wgpull/README",
+        "644",
+    ],
+    [
+        "../../node.toml",
+        "etc/wgpull/node.toml",
+        "600",
+    ],
+]
+maintainer-scripts = "package/debian/"
+systemd-units = [{ unit-name = "wgpull-node", enable = false }]

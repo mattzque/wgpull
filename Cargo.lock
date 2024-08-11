@@ -1651,8 +1651,59 @@ dependencies = [
 ]
 
 [[package]]
-name = "wgpull"
-version = "0.1.1"
+name = "wgpull_lighthouse"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "axum-macros",
+ "base64",
+ "chrono",
+ "env_logger",
+ "futures-util",
+ "hex",
+ "ipnet",
+ "log",
+ "rand",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tower",
+ "wgpull_shared",
+]
+
+[[package]]
+name = "wgpull_node"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64",
+ "chrono",
+ "env_logger",
+ "hex",
+ "ipnet",
+ "log",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "toml",
+ "wgpull_shared",
+]
+
+[[package]]
+name = "wgpull_shared"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",

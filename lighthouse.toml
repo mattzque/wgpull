@@ -1,0 +1,29 @@
+[lighthouse]
+# key to authenticate nodes against the lighthouse
+lighthouse_key = "change_me"
+
+# key to authenticate lighthouse against the nodes
+node_key = "change_me"
+
+# HTTPS server port
+port = 2001
+
+# HTTPS server binds to this host
+bindhost = "0.0.0.0"
+
+# lighthouse will orchestrate key rotation across the
+# entire network using this interval (1 week in the example)
+key_rotation_interval_seconds = 604800
+
+# lighthouse will rotate keys at this time of day (between 2:00
+#   and 3:00 at night in the example)
+key_rotation_tod = [2, 3]
+
+# lighthouse will remove nodes from the network that have not
+#   been seen for this amount of time (5 minutes in the example)
+node_timeout_seconds = 300
+
+# lighthouse stores its current state in this file and restores
+#   it on startup, this way the service can be restarted without
+#   losing the network state
+state_file = "/var/lib/wgpull_lighthouse.state"

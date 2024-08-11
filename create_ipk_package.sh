@@ -3,8 +3,10 @@
 
 set -e
 
-PACKAGE="wgpull"
-VERSION=$(grep '^version' Cargo.toml | sed -E 's/version = "(.+)"/\1/')
+NAME=$1
+PACKAGE=wgpull-$1
+# "wgpull"
+VERSION=$(grep '^version' crates/$NAME/Cargo.toml | sed -E 's/version = "(.+)"/\1/')
 # TODO figure out what arch to use for armv7-unknown-linux-musleabihf rust target
 ARCH="all"
 
@@ -22,9 +24,12 @@ mkdir -p $CONTROL_DIR
 # Copy static files
 cp -R package/openwrt/* $DATA_DIR/
 
-# Copy the binaries
-cp $BUILD_DIR/wgpull-lighthouse $DATA_DIR/usr/bin/
-cp $BUILD_DIR/wgpull-node $DATA_DIR/usr/bin/
+# Copy the binary
+cp $BUILD_DIR/wgpull-$NAME $DATA_DIR/usr/bin/
+
+# Copy the configuration files
+mkdir -p $DATA_DIR/etc/wgpull/
+cp node.toml lighthouse.toml $DATA_DIR/etc/wgpull/
 
 # Create the control file
 echo "Package: $PACKAGE" > $CONTROL_DIR/control
